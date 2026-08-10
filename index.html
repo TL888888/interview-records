@@ -30,9 +30,16 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
   }
   header .title { font-size: 18px; font-weight: bold; }
   header .title span { color: #9fb4ff; font-weight: normal; font-size: 14px; margin-left: 8px; }
+  header .excel-actions { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  header .excel-actions input[type=file] {
+    color: #cbd5e1; font-size: 12px; max-width: 160px;
+  }
+  header .excel-actions .btn { padding: 7px 12px; font-size: 12px; }
   header .user-info { display: flex; align-items: center; gap: 16px; font-size: 14px; }
   header .user-info button {
     background: #b91c1c; color: #fff; border: none; padding: 6px 14px;
@@ -65,10 +72,15 @@
   .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text); }
   .btn-danger { background: #fee2e2; color: #b91c1c; border: none; }
   .btn-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { border-collapse: collapse; margin-top: 14px; font-size: 13px; width: max-content; min-width: 100%; }
   th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  th { color: var(--muted); font-weight: bold; background: #fafbfc; }
-  td.pre { white-space: pre-wrap; }
+  th { color: var(--muted); font-weight: bold; background: #fafbfc; white-space: nowrap; }
+  td.pre { white-space: pre-wrap; }         /* 人員/公司：保留換行，並在窄欄內自動折行 */
+  td.pre-nowrap { white-space: pre; }       /* 內容/備註：保留換行，但不折行，超出用橫向捲動看 */
+  td.col-date { width: 90px; min-width: 90px; white-space: nowrap; }
+  td.col-company { width: 64px; min-width: 64px; max-width: 64px; }
+  td.col-person { width: 54px; min-width: 54px; max-width: 54px; }
   .search-big {
     font-size: 18px; padding: 16px 18px;
   }
@@ -108,11 +120,17 @@
 <div id="appView" class="hidden">
   <header>
     <div class="title">董事長聯絡事項查詢系統 <span>Contact Records</span></div>
+    <div id="excelActions" class="excel-actions hidden">
+      <input id="excelFile" type="file" accept=".xlsx,.xls" title="選擇 Excel 檔(欄位：日期/公司/單位/人員/內容/備註)" />
+      <button class="btn btn-primary" onclick="importExcel()">匯入（全部覆蓋）</button>
+      <button class="btn btn-outline" onclick="exportExcel()">匯出</button>
+    </div>
     <div class="user-info">
       <span id="userEmailLabel"></span>
       <button onclick="doLogout()">登出</button>
     </div>
   </header>
+  <div id="importMsgWrap" style="max-width:1200px; margin:0 auto; padding:0 16px;"><div id="importMsg"></div></div>
 
   <div class="container">
     <div class="tabs">
@@ -143,12 +161,14 @@
       <div class="result-count">搜尋總筆數：<b id="resultCount">-</b> 筆</div>
 
 
+      <div class="table-wrap">
       <table>
         <thead>
-          <tr><th style="width:100px">日期</th><th style="width:140px">公司/單位</th><th style="width:140px">人員</th><th>內容</th><th style="width:140px">備註</th></tr>
+          <tr><th style="width:90px">日期</th><th style="width:64px">公司/單位</th><th style="width:54px">人員</th><th>內容</th><th>備註</th></tr>
         </thead>
         <tbody id="resultsBody"></tbody>
       </table>
+      </div>
     </div>
 
     <!-- 輸入畫面 -->
@@ -168,26 +188,19 @@
 
       <hr style="margin:24px 0; border:none; border-top:1px solid var(--border)" />
 
-      <h3>Excel 匯入 / 匯出</h3>
       <p style="font-size:13px; color:var(--muted)">
-        匯入採「全部覆蓋」：上傳的 Excel 必須包含完整的歷史資料，系統會清空舊資料後整批寫入。
-        欄位需為：日期、公司/單位、人員、內容、備註（沒有備註欄可留空）。
+        Excel 匯入 / 匯出已移到頁面右上角。匯入採「全部覆蓋」：上傳的 Excel 必須包含完整的歷史資料，欄位需為：日期、公司/單位、人員、內容、備註。
       </p>
-      <input id="excelFile" type="file" accept=".xlsx,.xls" />
-      <div class="btn-row">
-        <button class="btn btn-primary" onclick="importExcel()">匯入（全部覆蓋）</button>
-        <button class="btn btn-outline" onclick="exportExcel()">匯出目前全部資料</button>
-      </div>
-      <div id="importMsg"></div>
 
-      <hr style="margin:24px 0; border:none; border-top:1px solid var(--border)" />
       <h3>目前全部資料（<span id="allCount">-</span> 筆，最新在上）</h3>
+      <div class="table-wrap">
       <table>
         <thead>
-          <tr><th style="width:100px">日期</th><th style="width:140px">公司/單位</th><th style="width:140px">人員</th><th>內容</th><th style="width:140px">備註</th><th style="width:60px">刪除</th></tr>
+          <tr><th style="width:90px">日期</th><th style="width:64px">公司/單位</th><th style="width:54px">人員</th><th>內容</th><th>備註</th><th style="width:60px">刪除</th></tr>
         </thead>
         <tbody id="allBody"></tbody>
       </table>
+      </div>
     </div>
 
     <!-- 帳號管理畫面 (admin only) -->
@@ -244,7 +257,7 @@
 // 請到 Supabase 專案 Settings > API 複製這兩個值貼進來。
 // ============================================================
 const SUPABASE_URL = 'https://bvuygyajzupeqpqfwmgi.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2dXlneWFqenVwZXFwcWZ3bWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNjA5MjQsImV4cCI6MjA5NzczNjkyNH0.zvP-JWgHRWiCKZbqSSU6-uGgx3WHwG0nFxfG8xDhEH8';
+const SUPABASE_ANON_KEY = '請貼上您的 anon public key';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -298,7 +311,7 @@ function enterApp() {
 
   if (currentRole === 'admin') {
     document.getElementById('tabBtnAdmin').classList.remove('hidden');
-    document.getElementById('excelFile').disabled = false;
+    document.getElementById('excelActions').classList.remove('hidden');
   } else {
     // viewer 隱藏輸入相關操作
     document.getElementById('inputTab').querySelectorAll('input,textarea,button').forEach(el => el.disabled = true);
@@ -344,11 +357,11 @@ async function runSearch() {
   const body = document.getElementById('resultsBody');
   body.innerHTML = lastSearchResults.map(r => `
     <tr>
-      <td>${r.record_date || ''}</td>
-      <td>${escapeHtml(r.company)}</td>
-      <td class="pre">${escapeHtml(r.person)}</td>
-      <td class="pre">${escapeHtml(r.content)}</td>
-      <td class="pre">${escapeHtml(r.note)}</td>
+      <td class="col-date">${r.record_date || ''}</td>
+      <td class="pre col-company">${escapeHtml(r.company)}</td>
+      <td class="pre col-person">${escapeHtml(r.person)}</td>
+      <td class="pre-nowrap">${escapeHtml(r.content)}</td>
+      <td class="pre-nowrap">${escapeHtml(r.note)}</td>
     </tr>
   `).join('');
 }
@@ -394,11 +407,11 @@ async function refreshAllRecords() {
   const body = document.getElementById('allBody');
   body.innerHTML = data.map(r => `
     <tr>
-      <td>${r.record_date || ''}</td>
-      <td>${escapeHtml(r.company)}</td>
-      <td class="pre">${escapeHtml(r.person)}</td>
-      <td class="pre">${escapeHtml(r.content)}</td>
-      <td class="pre">${escapeHtml(r.note)}</td>
+      <td class="col-date">${r.record_date || ''}</td>
+      <td class="pre col-company">${escapeHtml(r.company)}</td>
+      <td class="pre col-person">${escapeHtml(r.person)}</td>
+      <td class="pre-nowrap">${escapeHtml(r.content)}</td>
+      <td class="pre-nowrap">${escapeHtml(r.note)}</td>
       <td><button class="btn btn-danger" onclick="deleteRecord('${r.id}')">刪除</button></td>
     </tr>
   `).join('');
@@ -564,3 +577,4 @@ async function changePassword() {
 </script>
 </body>
 </html>
+
