@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>董事長聯絡事項查詢系統</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --navy: #0f1b33;
+    --blue: #2563eb;
+    --blue-dark: #1d4ed8;
+    --border: #e2e5ea;
+    --bg: #f5f6f8;
+    --text: #1f2937;
+    --muted: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    background: var(--navy);
+    color: #fff;
+    padding: 14px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  header .title { font-size: 18px; font-weight: bold; }
+  header .title span { color: #9fb4ff; font-weight: normal; font-size: 14px; margin-left: 8px; }
+  header .user-info { display: flex; align-items: center; gap: 16px; font-size: 14px; }
+  header .user-info button {
+    background: #b91c1c; color: #fff; border: none; padding: 6px 14px;
+    border-radius: 6px; cursor: pointer; font-size: 13px;
+  }
+  .container { max-width: 1200px; margin: 20px auto; padding: 0 16px; }
+  .card {
+    background: #fff; border-radius: 10px; border: 1px solid var(--border);
+    padding: 20px; margin-bottom: 16px;
+  }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tabs button {
+    padding: 10px 20px; border-radius: 8px; border: 1px solid var(--border);
+    background: #fff; cursor: pointer; font-size: 14px; font-weight: bold; color: var(--muted);
+  }
+  .tabs button.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  input, textarea {
+    width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 14px; font-family: inherit;
+  }
+  textarea { resize: vertical; min-height: 60px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+  .btn {
+    padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer;
+    font-size: 14px; font-weight: bold;
+  }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: var(--blue-dark); }
+  .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text); }
+  .btn-danger { background: #fee2e2; color: #b91c1c; border: none; }
+  .btn-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: bold; background: #fafbfc; }
+  td.pre { white-space: pre-wrap; }
+  .search-big {
+    font-size: 18px; padding: 16px 18px;
+  }
+  .result-count { font-size: 14px; color: var(--muted); margin: 10px 0; }
+  .result-count b { color: var(--text); font-size: 16px; }
+  .hidden { display: none !important; }
+  .msg { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-top: 10px; }
+  .msg.ok { background: #dcfce7; color: #166534; }
+  .msg.err { background: #fee2e2; color: #b91c1c; }
+  .login-box {
+    max-width: 360px; margin: 100px auto; background: #fff; padding: 30px;
+    border-radius: 10px; border: 1px solid var(--border);
+  }
+  .login-box h2 { margin-top: 0; }
+  .ai-box { background: #f0f5ff; border: 1px solid #c7d7fe; border-radius: 8px; padding: 14px; margin-top: 14px; }
+  .role-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px;
+    background: #e0e7ff; color: #3730a3; margin-left: 6px;
+  }
+</style>
+</head>
+<body>
+
+<div id="loginView" class="login-box">
+  <h2>董事長聯絡事項查詢系統</h2>
+  <label>Email</label>
+  <input id="loginEmail" type="email" placeholder="you@tlhome.com.tw" />
+  <div style="height:10px"></div>
+  <label>密碼</label>
+  <input id="loginPassword" type="password" />
+  <div class="btn-row">
+    <button class="btn btn-primary" style="width:100%" onclick="doLogin()">登入</button>
+  </div>
+  <div id="loginMsg"></div>
+</div>
+
+<div id="appView" class="hidden">
+  <header>
+    <div class="title">董事長聯絡事項查詢系統 <span>Contact Records</span></div>
+    <div class="user-info">
+      <span id="userEmailLabel"></span>
+      <button onclick="doLogout()">登出</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="tabs">
+      <button id="tabBtnQuery" class="active" onclick="switchTab('query')">查詢</button>
+      <button id="tabBtnInput" onclick="switchTab('input')">輸入</button>
+      <button id="tabBtnAdmin" class="hidden" onclick="switchTab('admin')">帳號管理</button>
+    </div>
+
+    <!-- 查詢畫面 -->
+    <div id="queryTab" class="card">
+      <label>模糊搜尋（姓名 / 公司 / 內容 / 備註，皆可）</label>
+      <input id="searchBox" class="search-big" placeholder="輸入關鍵字，例如：陳依梅 或 工研院" onkeydown="if(event.key==='Enter') runSearch()" />
+      <div class="grid" style="margin-top:14px">
+        <div>
+          <label>開始日期</label>
+          <input id="filterDateFrom" type="date" />
+        </div>
+        <div>
+          <label>結束日期</label>
+          <input id="filterDateTo" type="date" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runSearch()">🔍 檢索</button>
+        <button class="btn btn-outline" onclick="clearSearch()">清除條件</button>
+      </div>
+      <div class="result-count">搜尋總筆數：<b id="resultCount">-</b> 筆</div>
+
+      <div class="ai-box">
+        <label>AI 摘要（針對目前搜尋結果，用一句話問，例如：這個人見過幾次？）</label>
+        <input id="aiQuestion" placeholder="例如：陳依梅總共見過幾次？都談了什麼？" />
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="askAI()">請 AI 摘要</button>
+        </div>
+        <div id="aiAnswer" style="margin-top:10px; white-space:pre-wrap; font-size:14px;"></div>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th style="width:100px">日期</th><th style="width:140px">公司/單位</th><th style="width:140px">人員</th><th>內容</th><th style="width:140px">備註</th></tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+
+    <!-- 輸入畫面 -->
+    <div id="inputTab" class="card hidden">
+      <h3 style="margin-top:0">手動新增一筆</h3>
+      <div class="grid">
+        <div><label>日期</label><input id="newDate" type="date" /></div>
+        <div><label>公司/單位</label><input id="newCompany" /></div>
+        <div><label>人員</label><input id="newPerson" /></div>
+      </div>
+      <div style="margin-top:14px"><label>內容</label><textarea id="newContent"></textarea></div>
+      <div style="margin-top:14px"><label>備註</label><textarea id="newNote"></textarea></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="addRecord()">新增這筆</button>
+      </div>
+      <div id="addMsg"></div>
+
+      <hr style="margin:24px 0; border:none; border-top:1px solid var(--border)" />
+
+      <h3>Excel 匯入 / 匯出</h3>
+      <p style="font-size:13px; color:var(--muted)">
+        匯入採「全部覆蓋」：上傳的 Excel 必須包含完整的歷史資料，系統會清空舊資料後整批寫入。
+        欄位需為：日期、公司/單位、人員、內容、備註（沒有備註欄可留空）。
+      </p>
+      <input id="excelFile" type="file" accept=".xlsx,.xls" />
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="importExcel()">匯入（全部覆蓋）</button>
+        <button class="btn btn-outline" onclick="exportExcel()">匯出目前全部資料</button>
+      </div>
+      <div id="importMsg"></div>
+
+      <hr style="margin:24px 0; border:none; border-top:1px solid var(--border)" />
+      <h3>目前全部資料（<span id="allCount">-</span> 筆，最新在上）</h3>
+      <table>
+        <thead>
+          <tr><th style="width:100px">日期</th><th style="width:140px">公司/單位</th><th style="width:140px">人員</th><th>內容</th><th style="width:140px">備註</th><th style="width:60px">刪除</th></tr>
+        </thead>
+        <tbody id="allBody"></tbody>
+      </table>
+    </div>
+
+    <!-- 帳號管理畫面 (admin only) -->
+    <div id="adminTab" class="card hidden">
+      <h3 style="margin-top:0">帳號管理</h3>
+      <div class="grid">
+        <div><label>Email</label><input id="newAccEmail" placeholder="name@tlhome.com.tw" /></div>
+        <div>
+          <label>角色</label>
+          <select id="newAccRole" style="width:100%; padding:9px 10px; border:1px solid var(--border); border-radius:6px;">
+            <option value="admin">admin（可新增/編輯/刪除/匯入匯出/管理帳號）</option>
+            <option value="viewer">viewer（僅可查詢）</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="addAccount()">新增 / 更新這個帳號</button>
+      </div>
+      <p style="font-size:12px; color:var(--muted)">
+        注意：這裡只設定「誰可以用這個系統、是什麼角色」。實際登入帳號（email + 密碼）仍需先請 IT 或用 Supabase Auth 建立好，這裡只是授權。
+      </p>
+      <div id="accMsg"></div>
+      <table>
+        <thead><tr><th>Email</th><th style="width:120px">角色</th><th style="width:80px">移除</th></tr></thead>
+        <tbody id="accBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// 設定區：請填入您的 Supabase TL_projects 專案資訊
+// SUPABASE_ANON_KEY 是「匿名公開金鑰」，設計上就是給前端網頁用的，
+// 搭配 RLS 規則就是安全的，不是要保密的 service_role key。
+// 請到 Supabase 專案 Settings > API 複製這兩個值貼進來。
+// ============================================================
+const SUPABASE_URL = 'https://bvuygyajzupeqpqfwmgi.supabase.co';
+const SUPABASE_ANON_KEY = '請貼上您的 anon public key';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let currentRole = null;
+let lastSearchResults = [];
+
+// ---------- 登入 / 登出 ----------
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const msgEl = document.getElementById('loginMsg');
+  msgEl.innerHTML = '';
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    msgEl.innerHTML = `<div class="msg err">登入失敗：${error.message}</div>`;
+    return;
+  }
+
+  const { data: access, error: accessErr } = await sb
+    .from('interview_access')
+    .select('role')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (accessErr || !access) {
+    msgEl.innerHTML = `<div class="msg err">此帳號未授權使用本系統，請聯絡管理員開通。</div>`;
+    await sb.auth.signOut();
+    return;
+  }
+
+  currentUser = data.user;
+  currentRole = access.role;
+  enterApp();
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  currentUser = null;
+  currentRole = null;
+  document.getElementById('appView').classList.add('hidden');
+  document.getElementById('loginView').classList.remove('hidden');
+}
+
+function enterApp() {
+  document.getElementById('loginView').classList.add('hidden');
+  document.getElementById('appView').classList.remove('hidden');
+  document.getElementById('userEmailLabel').innerHTML =
+    currentUser.email + `<span class="role-badge">${currentRole}</span>`;
+
+  if (currentRole === 'admin') {
+    document.getElementById('tabBtnAdmin').classList.remove('hidden');
+    document.getElementById('excelFile').disabled = false;
+  } else {
+    // viewer 隱藏輸入相關操作
+    document.getElementById('inputTab').querySelectorAll('input,textarea,button').forEach(el => el.disabled = true);
+  }
+
+  runSearch();
+  refreshAllRecords();
+  if (currentRole === 'admin') refreshAccounts();
+}
+
+// ---------- Tab 切換 ----------
+function switchTab(tab) {
+  ['query', 'input', 'admin'].forEach(t => {
+    document.getElementById(t + 'Tab').classList.toggle('hidden', t !== tab);
+    document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
+  });
+}
+
+// ---------- 查詢 ----------
+async function runSearch() {
+  const keyword = document.getElementById('searchBox').value.trim();
+  const dateFrom = document.getElementById('filterDateFrom').value;
+  const dateTo = document.getElementById('filterDateTo').value;
+
+  let query = sb.from('interview_records').select('*').order('record_date', { ascending: false });
+
+  if (dateFrom) query = query.gte('record_date', dateFrom);
+  if (dateTo) query = query.lte('record_date', dateTo);
+  if (keyword) {
+    const like = `%${keyword}%`;
+    query = query.or(`company.ilike.${like},person.ilike.${like},content.ilike.${like},note.ilike.${like}`);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    alert('搜尋失敗：' + error.message);
+    return;
+  }
+
+  lastSearchResults = data || [];
+  document.getElementById('resultCount').textContent = lastSearchResults.length;
+
+  const body = document.getElementById('resultsBody');
+  body.innerHTML = lastSearchResults.map(r => `
+    <tr>
+      <td>${r.record_date || ''}</td>
+      <td>${escapeHtml(r.company)}</td>
+      <td class="pre">${escapeHtml(r.person)}</td>
+      <td class="pre">${escapeHtml(r.content)}</td>
+      <td class="pre">${escapeHtml(r.note)}</td>
+    </tr>
+  `).join('');
+}
+
+function clearSearch() {
+  document.getElementById('searchBox').value = '';
+  document.getElementById('filterDateFrom').value = '';
+  document.getElementById('filterDateTo').value = '';
+  runSearch();
+}
+
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+// ---------- AI 摘要 ----------
+async function askAI() {
+  const question = document.getElementById('aiQuestion').value.trim();
+  const answerEl = document.getElementById('aiAnswer');
+  if (!question) { answerEl.textContent = '請先輸入問題。'; return; }
+  if (lastSearchResults.length === 0) { answerEl.textContent = '目前搜尋結果是空的，請先調整搜尋條件。'; return; }
+
+  answerEl.textContent = 'AI 整理中...';
+
+  const records = lastSearchResults.map(r => ({
+    name: r.person, company: r.company, title: '', occasion_type: '',
+    location: '', date: r.record_date, summary: r.content + (r.note ? '\n備註：' + r.note : '')
+  }));
+
+  try {
+    const res = await fetch('/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, records })
+    });
+    const data = await res.json();
+    answerEl.textContent = data.answer || data.error || '無回應';
+  } catch (err) {
+    answerEl.textContent = 'AI 服務發生錯誤：' + err.message;
+  }
+}
+
+// ---------- 輸入畫面：手動新增 ----------
+async function addRecord() {
+  const record = {
+    record_date: document.getElementById('newDate').value || null,
+    company: document.getElementById('newCompany').value.trim(),
+    person: document.getElementById('newPerson').value.trim(),
+    content: document.getElementById('newContent').value.trim(),
+    note: document.getElementById('newNote').value.trim(),
+    uploaded_by: currentUser.email
+  };
+  const msgEl = document.getElementById('addMsg');
+  const { error } = await sb.from('interview_records').insert(record);
+  if (error) {
+    msgEl.innerHTML = `<div class="msg err">新增失敗：${error.message}</div>`;
+    return;
+  }
+  msgEl.innerHTML = `<div class="msg ok">新增成功</div>`;
+  ['newDate','newCompany','newPerson','newContent','newNote'].forEach(id => document.getElementById(id).value = '');
+  refreshAllRecords();
+  runSearch();
+}
+
+async function refreshAllRecords() {
+  const { data, error } = await sb.from('interview_records').select('*').order('record_date', { ascending: false });
+  if (error) return;
+  document.getElementById('allCount').textContent = data.length;
+  const body = document.getElementById('allBody');
+  body.innerHTML = data.map(r => `
+    <tr>
+      <td>${r.record_date || ''}</td>
+      <td>${escapeHtml(r.company)}</td>
+      <td class="pre">${escapeHtml(r.person)}</td>
+      <td class="pre">${escapeHtml(r.content)}</td>
+      <td class="pre">${escapeHtml(r.note)}</td>
+      <td><button class="btn btn-danger" onclick="deleteRecord('${r.id}')">刪除</button></td>
+    </tr>
+  `).join('');
+}
+
+async function deleteRecord(id) {
+  if (!confirm('確定刪除這一筆？')) return;
+  const { error } = await sb.from('interview_records').delete().eq('id', id);
+  if (error) { alert('刪除失敗：' + error.message); return; }
+  refreshAllRecords();
+  runSearch();
+}
+
+// ---------- Excel 匯入 / 匯出 ----------
+async function importExcel() {
+  const fileInput = document.getElementById('excelFile');
+  const msgEl = document.getElementById('importMsg');
+  if (!fileInput.files.length) { msgEl.innerHTML = `<div class="msg err">請先選擇檔案</div>`; return; }
+  if (!confirm('匯入會清空目前所有資料，改成這份 Excel 的完整內容，確定要繼續嗎？')) return;
+
+  const file = fileInput.files[0];
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+  const records = rows.map(row => {
+    const dateVal = row['日期'];
+    let recordDate = null;
+    if (dateVal instanceof Date) {
+      recordDate = dateVal.toISOString().slice(0, 10);
+    } else if (typeof dateVal === 'string' && dateVal.trim()) {
+      recordDate = dateVal.trim();
+    }
+    return {
+      record_date: recordDate,
+      company: String(row['公司/單位'] || row['公司'] || '').trim(),
+      person: String(row['人員'] || row['姓名'] || '').trim(),
+      content: String(row['內容'] || '').trim(),
+      note: String(row['備註'] || row['陪同人員'] || '').trim(),
+      uploaded_by: currentUser.email
+    };
+  }).filter(r => r.person || r.company || r.content);
+
+  if (records.length === 0) {
+    msgEl.innerHTML = `<div class="msg err">Excel 裡讀不到資料，請確認欄位名稱是否為：日期/公司/單位/人員/內容/備註</div>`;
+    return;
+  }
+
+  // 全部覆蓋：先清空再整批寫入
+  const { error: delErr } = await sb.from('interview_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  if (delErr) { msgEl.innerHTML = `<div class="msg err">清空舊資料失敗：${delErr.message}</div>`; return; }
+
+  const { error: insErr } = await sb.from('interview_records').insert(records);
+  if (insErr) { msgEl.innerHTML = `<div class="msg err">寫入失敗：${insErr.message}</div>`; return; }
+
+  msgEl.innerHTML = `<div class="msg ok">匯入成功，共 ${records.length} 筆</div>`;
+  fileInput.value = '';
+  refreshAllRecords();
+  runSearch();
+}
+
+async function exportExcel() {
+  const { data, error } = await sb.from('interview_records').select('*').order('record_date', { ascending: false });
+  if (error) { alert('匯出失敗：' + error.message); return; }
+
+  const rows = data.map(r => ({
+    '日期': r.record_date || '',
+    '公司/單位': r.company || '',
+    '人員': r.person || '',
+    '內容': r.content || '',
+    '備註': r.note || ''
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '聯絡事項');
+  XLSX.writeFile(wb, `董事長聯絡事項_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ---------- 帳號管理 (admin only) ----------
+async function refreshAccounts() {
+  const { data, error } = await sb.from('interview_access').select('*').order('email');
+  if (error) return;
+  const body = document.getElementById('accBody');
+  body.innerHTML = data.map(a => `
+    <tr>
+      <td>${escapeHtml(a.email)}</td>
+      <td>${a.role}</td>
+      <td><button class="btn btn-danger" onclick="deleteAccount('${a.email}')">移除</button></td>
+    </tr>
+  `).join('');
+}
+
+async function addAccount() {
+  const email = document.getElementById('newAccEmail').value.trim();
+  const role = document.getElementById('newAccRole').value;
+  const msgEl = document.getElementById('accMsg');
+  if (!email) { msgEl.innerHTML = `<div class="msg err">請輸入 email</div>`; return; }
+
+  const { error } = await sb.from('interview_access').upsert({ email, role });
+  if (error) { msgEl.innerHTML = `<div class="msg err">失敗：${error.message}</div>`; return; }
+  msgEl.innerHTML = `<div class="msg ok">已新增/更新</div>`;
+  document.getElementById('newAccEmail').value = '';
+  refreshAccounts();
+}
+
+async function deleteAccount(email) {
+  if (!confirm(`確定移除 ${email} 的使用權限？`)) return;
+  const { error } = await sb.from('interview_access').delete().eq('email', email);
+  if (error) { alert('失敗：' + error.message); return; }
+  refreshAccounts();
+}
+
+// ---------- 進站時檢查是否已登入 ----------
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data.session) {
+    const email = data.session.user.email;
+    const { data: access } = await sb.from('interview_access').select('role').eq('email', email).maybeSingle();
+    if (access) {
+      currentUser = data.session.user;
+      currentRole = access.role;
+      enterApp();
+    }
+  }
+})();
+</script>
+</body>
+</html>
