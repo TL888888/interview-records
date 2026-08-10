@@ -141,14 +141,6 @@
       </div>
       <div class="result-count">搜尋總筆數：<b id="resultCount">-</b> 筆</div>
 
-      <div class="ai-box">
-        <label>AI 摘要（針對目前搜尋結果，用一句話問，例如：這個人見過幾次？）</label>
-        <input id="aiQuestion" placeholder="例如：陳依梅總共見過幾次？都談了什麼？" />
-        <div class="btn-row">
-          <button class="btn btn-primary" onclick="askAI()">請 AI 摘要</button>
-        </div>
-        <div id="aiAnswer" style="margin-top:10px; white-space:pre-wrap; font-size:14px;"></div>
-      </div>
 
       <table>
         <thead>
@@ -352,33 +344,6 @@ function clearSearch() {
 function escapeHtml(s) {
   if (!s) return '';
   return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-}
-
-// ---------- AI 摘要 ----------
-async function askAI() {
-  const question = document.getElementById('aiQuestion').value.trim();
-  const answerEl = document.getElementById('aiAnswer');
-  if (!question) { answerEl.textContent = '請先輸入問題。'; return; }
-  if (lastSearchResults.length === 0) { answerEl.textContent = '目前搜尋結果是空的，請先調整搜尋條件。'; return; }
-
-  answerEl.textContent = 'AI 整理中...';
-
-  const records = lastSearchResults.map(r => ({
-    name: r.person, company: r.company, title: '', occasion_type: '',
-    location: '', date: r.record_date, summary: r.content + (r.note ? '\n備註：' + r.note : '')
-  }));
-
-  try {
-    const res = await fetch('/api/ask', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, records })
-    });
-    const data = await res.json();
-    answerEl.textContent = data.answer || data.error || '無回應';
-  } catch (err) {
-    answerEl.textContent = 'AI 服務發生錯誤：' + err.message;
-  }
 }
 
 // ---------- 輸入畫面：手動新增 ----------
