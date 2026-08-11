@@ -327,13 +327,18 @@ async function doLogin() {
 
 async function doLogout() {
   await sb.auth.signOut();
-  currentUser = null;
-  currentRole = null;
-  document.getElementById('appView').classList.add('hidden');
-  document.getElementById('loginView').classList.remove('hidden');
+  // 強制整頁重新載入，確保上一個人的角色/UI狀態(包括帳號管理分頁、Excel按鈕等)完全清除，
+  // 不會殘留給下一個登入的人看到或用到
+  location.reload();
 }
 
 function enterApp() {
+  // 先把所有依角色顯示的區塊重置為隱藏，再依目前登入者的角色決定要顯示哪些，
+  // 避免同一頁面前後登入不同角色時，上一個人的權限UI殘留
+  document.getElementById('tabBtnAdmin').classList.add('hidden');
+  document.getElementById('tabBtnInput').classList.remove('hidden');
+  document.getElementById('excelActions').classList.add('hidden');
+
   document.getElementById('loginView').classList.add('hidden');
   document.getElementById('appView').classList.remove('hidden');
   document.getElementById('userEmailLabel').innerHTML =
