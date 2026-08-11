@@ -17,6 +17,10 @@
     --muted: #6b7280;
   }
   * { box-sizing: border-box; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
   body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "PingFang TC", Roboto, Helvetica, Arial, sans-serif;
@@ -124,9 +128,24 @@
     <div class="title">董事長聯絡事項查詢系統 <span>Contact Records</span></div>
     <div class="user-info">
       <span id="userEmailLabel"></span>
+      <a href="javascript:void(0)" onclick="togglePwdBox()" style="color:#cbd5e1; font-size:13px; text-decoration:underline;">修改密碼</a>
       <button onclick="doLogout()">登出</button>
     </div>
   </header>
+
+  <div id="pwdBox" class="hidden" style="max-width:1200px; margin:12px auto 0; padding:0 16px;">
+    <div class="card" style="max-width:420px; padding:16px 20px;">
+      <div class="grid">
+        <div><label>新密碼</label><input id="newPassword1" type="password" placeholder="至少 6 碼" /></div>
+        <div><label>再輸入一次</label><input id="newPassword2" type="password" /></div>
+      </div>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-primary" onclick="changePassword()">更新密碼</button>
+        <button class="btn btn-outline" onclick="togglePwdBox()">取消</button>
+      </div>
+      <div id="pwdMsg"></div>
+    </div>
+  </div>
 
   <div class="container">
     <div class="toolbar-row">
@@ -134,7 +153,6 @@
         <button id="tabBtnQuery" class="active" onclick="switchTab('query')">查詢</button>
         <button id="tabBtnInput" onclick="switchTab('input')">輸入</button>
         <button id="tabBtnAdmin" class="hidden" onclick="switchTab('admin')">帳號管理</button>
-        <button id="tabBtnSettings" onclick="switchTab('settings')">帳號設定</button>
       </div>
       <div id="excelActions" class="excel-actions hidden">
         <input id="excelFile" type="file" accept=".xlsx,.xls" title="選擇 Excel 檔(欄位：日期/公司/單位/人員/內容/備註)" />
@@ -174,6 +192,7 @@
         <tbody id="resultsBody"></tbody>
       </table>
       </div>
+      <div id="resultsPager" class="btn-row" style="align-items:center; justify-content:flex-end;"></div>
     </div>
 
     <!-- 輸入畫面 -->
@@ -206,6 +225,7 @@
         <tbody id="allBody"></tbody>
       </table>
       </div>
+      <div id="allPager" class="btn-row" style="align-items:center; justify-content:flex-end;"></div>
     </div>
 
     <!-- 帳號管理畫面 (admin only) -->
@@ -238,19 +258,6 @@
         <tbody id="accBody"></tbody>
       </table>
     </div>
-
-    <!-- 帳號設定畫面 (所有登入者皆可用) -->
-    <div id="settingsTab" class="card hidden">
-      <h3 style="margin-top:0">修改密碼</h3>
-      <div class="grid">
-        <div><label>新密碼</label><input id="newPassword1" type="password" placeholder="至少 6 碼" /></div>
-        <div><label>再輸入一次</label><input id="newPassword2" type="password" /></div>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-primary" onclick="changePassword()">更新密碼</button>
-      </div>
-      <div id="pwdMsg"></div>
-    </div>
   </div>
 </div>
 
@@ -269,6 +276,24 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
 let currentRole = null;
 let lastSearchResults = [];
+let resultsPage = 1;
+let allRecordsData = [];
+let allPage = 1;
+const PAGE_SIZE = 20;
+
+// 共用分頁列 render：page 從 1 開始，onPageChange(newPage) 由呼叫端提供
+function renderPager(containerId, totalItems, page, onPageChange) {
+  const el = document.getElementById(containerId);
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  if (totalItems === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <button class="btn btn-outline" ${page <= 1 ? 'disabled' : ''} id="${containerId}Prev">上一頁</button>
+    <span style="font-size:13px; color:var(--muted); padding:0 6px;">第 ${page} / ${totalPages} 頁</span>
+    <button class="btn btn-outline" ${page >= totalPages ? 'disabled' : ''} id="${containerId}Next">下一頁</button>
+  `;
+  if (page > 1) document.getElementById(containerId + 'Prev').onclick = () => onPageChange(page - 1);
+  if (page < totalPages) document.getElementById(containerId + 'Next').onclick = () => onPageChange(page + 1);
+}
 
 // ---------- 登入 / 登出 ----------
 async function doLogin() {
@@ -318,8 +343,8 @@ function enterApp() {
     document.getElementById('tabBtnAdmin').classList.remove('hidden');
     document.getElementById('excelActions').classList.remove('hidden');
   } else {
-    // viewer 隱藏輸入相關操作
-    document.getElementById('inputTab').querySelectorAll('input,textarea,button').forEach(el => el.disabled = true);
+    // viewer：直接隱藏「輸入」分頁，不讓 viewer 看到一堆反白不能用的欄位
+    document.getElementById('tabBtnInput').classList.add('hidden');
   }
 
   runSearch();
@@ -329,10 +354,14 @@ function enterApp() {
 
 // ---------- Tab 切換 ----------
 function switchTab(tab) {
-  ['query', 'input', 'admin', 'settings'].forEach(t => {
+  ['query', 'input', 'admin'].forEach(t => {
     document.getElementById(t + 'Tab').classList.toggle('hidden', t !== tab);
     document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
   });
+}
+
+function togglePwdBox() {
+  document.getElementById('pwdBox').classList.toggle('hidden');
 }
 
 // ---------- 查詢 ----------
@@ -358,9 +387,16 @@ async function runSearch() {
 
   lastSearchResults = data || [];
   document.getElementById('resultCount').textContent = lastSearchResults.length;
+  resultsPage = 1;
+  renderResultsPage();
+}
+
+function renderResultsPage() {
+  const start = (resultsPage - 1) * PAGE_SIZE;
+  const pageItems = lastSearchResults.slice(start, start + PAGE_SIZE);
 
   const body = document.getElementById('resultsBody');
-  body.innerHTML = lastSearchResults.map(r => `
+  body.innerHTML = pageItems.map(r => `
     <tr>
       <td class="col-date">${r.record_date || ''}</td>
       <td class="pre-nowrap col-company">${escapeHtml(r.company)}</td>
@@ -369,6 +405,8 @@ async function runSearch() {
       <td class="pre-nowrap">${escapeHtml(r.note)}</td>
     </tr>
   `).join('');
+
+  renderPager('resultsPager', lastSearchResults.length, resultsPage, (p) => { resultsPage = p; renderResultsPage(); });
 }
 
 function clearSearch() {
@@ -418,9 +456,18 @@ async function addRecord() {
 async function refreshAllRecords() {
   const { data, error } = await sb.from('interview_records').select('*').order('record_date', { ascending: false });
   if (error) return;
-  document.getElementById('allCount').textContent = data.length;
+  allRecordsData = data || [];
+  document.getElementById('allCount').textContent = allRecordsData.length;
+  allPage = 1;
+  renderAllPage();
+}
+
+function renderAllPage() {
+  const start = (allPage - 1) * PAGE_SIZE;
+  const pageItems = allRecordsData.slice(start, start + PAGE_SIZE);
+
   const body = document.getElementById('allBody');
-  body.innerHTML = data.map(r => `
+  body.innerHTML = pageItems.map(r => `
     <tr>
       <td class="col-date">${r.record_date || ''}</td>
       <td class="pre-nowrap col-company">${escapeHtml(r.company)}</td>
@@ -430,6 +477,8 @@ async function refreshAllRecords() {
       <td><button class="btn btn-danger" onclick="deleteRecord('${r.id}')">刪除</button></td>
     </tr>
   `).join('');
+
+  renderPager('allPager', allRecordsData.length, allPage, (p) => { allPage = p; renderAllPage(); });
 }
 
 async function deleteRecord(id) {
