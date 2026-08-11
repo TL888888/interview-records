@@ -88,14 +88,15 @@
   .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text); }
   .btn-danger { background: #fee2e2; color: #b91c1c; border: none; }
   .btn-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table-wrap { overflow-x: auto; overflow-y: auto; max-height: 65vh; -webkit-overflow-scrolling: touch; }
   table { border-collapse: collapse; margin-top: 14px; font-size: 15px; width: max-content; min-width: 100%; }
   th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--border); vertical-align: top; font-size: 15px; line-height: 1.6; }
-  th { color: var(--muted); font-weight: 600; background: #fafbfc; white-space: nowrap; font-size: 13px; }
+  th { color: var(--muted); font-weight: 600; background: #fafbfc; white-space: nowrap; font-size: 13px; text-align: center; position: sticky; top: 0; z-index: 5; box-shadow: 0 1px 0 var(--border); }
   td.pre-nowrap { white-space: pre; }        /* 保留原本的換行(如多人分行)，但不因欄位窄而逐字折行 */
   td.col-date { width: 90px; min-width: 90px; white-space: nowrap; }
-  td.col-company { min-width: 80px; }
+  td.col-company { min-width: 80px; max-width: 150px; white-space: pre-wrap; word-break: break-word; }  /* 約10個中文字寬度就換行 */
   td.col-person { min-width: 80px; }
+  td.col-content { max-width: 450px; white-space: pre-wrap; word-break: break-word; }  /* 約30個中文字寬度就換行 */
   .search-big {
     font-size: 16px; padding: 14px 16px;
   }
@@ -153,6 +154,24 @@
         <button class="btn btn-outline" onclick="togglePwdBox()">取消</button>
       </div>
       <div id="pwdMsg"></div>
+    </div>
+  </div>
+
+  <div id="editBox" class="hidden" style="position:fixed; inset:0; background:rgba(15,27,51,0.4); z-index:50; display:flex; align-items:flex-start; justify-content:center; padding-top:60px; overflow-y:auto;">
+    <div class="card" style="max-width:480px; width:90%; padding:20px 22px; box-shadow:0 10px 30px rgba(0,0,0,0.2); margin-bottom:40px;">
+      <h3 style="margin-top:0">編輯這筆紀錄</h3>
+      <div class="grid">
+        <div><label>日期</label><input id="editDate" type="date" /></div>
+        <div><label>公司/單位</label><input id="editCompany" /></div>
+        <div><label>人員</label><input id="editPerson" /></div>
+      </div>
+      <div style="margin-top:14px"><label>內容</label><textarea id="editContent"></textarea></div>
+      <div style="margin-top:14px"><label>備註</label><textarea id="editNote"></textarea></div>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-primary" onclick="saveEditRecord()">儲存</button>
+        <button class="btn btn-outline" onclick="closeEditRecord()">取消</button>
+      </div>
+      <div id="editMsg"></div>
     </div>
   </div>
 
@@ -229,7 +248,7 @@
       <div class="table-wrap">
       <table>
         <thead>
-          <tr><th style="width:90px">日期</th><th style="min-width:80px">公司/單位</th><th style="min-width:80px">人員</th><th>內容</th><th>備註</th><th style="width:60px">刪除</th></tr>
+          <tr><th style="width:90px">日期</th><th style="min-width:80px">公司/單位</th><th style="min-width:80px">人員</th><th>內容</th><th>備註</th><th style="width:130px">操作</th></tr>
         </thead>
         <tbody id="allBody"></tbody>
       </table>
@@ -418,7 +437,7 @@ function renderResultsPage() {
       <td class="col-date">${r.record_date || ''}</td>
       <td class="pre-nowrap col-company">${escapeHtml(r.company)}</td>
       <td class="pre-nowrap col-person">${escapeHtml(r.person)}</td>
-      <td class="pre-nowrap">${escapeHtml(r.content)}</td>
+      <td class="col-content">${escapeHtml(r.content)}</td>
       <td class="pre-nowrap">${escapeHtml(r.note)}</td>
     </tr>
   `).join('');
@@ -489,9 +508,14 @@ function renderAllPage() {
       <td class="col-date">${r.record_date || ''}</td>
       <td class="pre-nowrap col-company">${escapeHtml(r.company)}</td>
       <td class="pre-nowrap col-person">${escapeHtml(r.person)}</td>
-      <td class="pre-nowrap">${escapeHtml(r.content)}</td>
+      <td class="col-content">${escapeHtml(r.content)}</td>
       <td class="pre-nowrap">${escapeHtml(r.note)}</td>
-      <td><button class="btn btn-danger" onclick="deleteRecord('${r.id}')">刪除</button></td>
+      <td>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-outline" style="padding:6px 10px; font-size:12px;" onclick="openEditRecord('${r.id}')">編輯</button>
+          <button class="btn btn-danger" style="padding:6px 10px; font-size:12px;" onclick="deleteRecord('${r.id}')">刪除</button>
+        </div>
+      </td>
     </tr>
   `).join('');
 
@@ -502,6 +526,45 @@ async function deleteRecord(id) {
   if (!confirm('確定刪除這一筆？')) return;
   const { error } = await sb.from('interview_records').delete().eq('id', id);
   if (error) { alert('刪除失敗：' + error.message); return; }
+  refreshAllRecords();
+  runSearch();
+}
+
+// ---------- 編輯單筆紀錄 ----------
+let editingRecordId = null;
+
+function openEditRecord(id) {
+  const r = allRecordsData.find(x => x.id === id);
+  if (!r) { alert('找不到這筆資料，畫面可能過期，請重新整理再試'); return; }
+  editingRecordId = id;
+  document.getElementById('editDate').value = r.record_date || '';
+  document.getElementById('editCompany').value = r.company || '';
+  document.getElementById('editPerson').value = r.person || '';
+  document.getElementById('editContent').value = r.content || '';
+  document.getElementById('editNote').value = r.note || '';
+  document.getElementById('editMsg').innerHTML = '';
+  document.getElementById('editBox').classList.remove('hidden');
+}
+
+function closeEditRecord() {
+  document.getElementById('editBox').classList.add('hidden');
+  editingRecordId = null;
+}
+
+async function saveEditRecord() {
+  if (!editingRecordId) return;
+  const msgEl = document.getElementById('editMsg');
+  const updated = {
+    record_date: document.getElementById('editDate').value || null,
+    company: document.getElementById('editCompany').value.trim(),
+    person: normalizePersonList(document.getElementById('editPerson').value),
+    content: document.getElementById('editContent').value.trim(),
+    note: document.getElementById('editNote').value.trim()
+  };
+  const { error } = await sb.from('interview_records').update(updated).eq('id', editingRecordId);
+  if (error) { msgEl.innerHTML = `<div class="msg err">儲存失敗：${error.message}</div>`; return; }
+
+  closeEditRecord();
   refreshAllRecords();
   runSearch();
 }
@@ -554,7 +617,7 @@ async function importExcel() {
         ].filter(Boolean).join('\n'),
         uploaded_by: currentUser.email
       };
-    }).filter(r => r.person || r.company || r.content);
+    }).filter(r => r.record_date || r.person || r.company || r.content || r.note);
 
     if (sheetRecords.length > 0) {
       sheetSummary.push(`${sheetName}(${sheetRecords.length}筆)`);
@@ -710,4 +773,3 @@ async function changePassword() {
 </script>
 </body>
 </html>
-
