@@ -11,17 +11,18 @@
     --navy: #0f1b33;
     --blue: #2563eb;
     --blue-dark: #1d4ed8;
-    --border: #e2e5ea;
-    --bg: #f5f6f8;
+    --border: #e5e7eb;
+    --bg: #f8fafc;
     --text: #1f2937;
     --muted: #6b7280;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "PingFang TC", Roboto, Helvetica, Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
+    font-size: 14px;
   }
   header {
     background: var(--navy);
@@ -30,20 +31,9 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-wrap: wrap;
-    row-gap: 10px;
   }
-  header .title { font-size: 18px; font-weight: bold; white-space: nowrap; }
-  header .title span { color: #9fb4ff; font-weight: normal; font-size: 14px; margin-left: 8px; }
-  header .excel-actions {
-    display: flex; align-items: center; gap: 8px; font-size: 13px;
-    background: rgba(255,255,255,0.06); padding: 6px 10px; border-radius: 8px;
-    order: 3; width: 100%; justify-content: flex-start;
-  }
-  header .excel-actions input[type=file] {
-    color: #cbd5e1; font-size: 12px; max-width: 180px;
-  }
-  header .excel-actions .btn { padding: 7px 12px; font-size: 12px; white-space: nowrap; }
+  header .title { font-size: 18px; font-weight: 600; white-space: nowrap; }
+  header .title span { color: #9fb4ff; font-weight: normal; font-size: 13px; margin-left: 8px; }
   header .user-info { display: flex; align-items: center; gap: 16px; font-size: 14px; }
   header .user-info button {
     background: #b91c1c; color: #fff; border: none; padding: 6px 14px;
@@ -54,22 +44,31 @@
     background: #fff; border-radius: 10px; border: 1px solid var(--border);
     padding: 20px; margin-bottom: 16px;
   }
-  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .toolbar-row {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
+  }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
   .tabs button {
-    padding: 10px 20px; border-radius: 8px; border: 1px solid var(--border);
-    background: #fff; cursor: pointer; font-size: 14px; font-weight: bold; color: var(--muted);
+    padding: 9px 18px; border-radius: 8px; border: 1px solid var(--border);
+    background: #fff; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--muted);
   }
   .tabs button.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .excel-actions {
+    display: flex; align-items: center; gap: 8px; font-size: 13px;
+    background: #fff; border: 1px solid var(--border); padding: 8px 10px; border-radius: 8px;
+  }
+  .excel-actions input[type=file] { font-size: 13px; max-width: 190px; color: var(--muted); }
   label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
-  input, textarea {
+  input, textarea, select {
     width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 6px;
     font-size: 14px; font-family: inherit;
   }
   textarea { resize: vertical; min-height: 60px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
   .btn {
-    padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer;
-    font-size: 14px; font-weight: bold;
+    padding: 9px 18px; border-radius: 6px; border: none; cursor: pointer;
+    font-size: 14px; font-weight: 600; white-space: nowrap;
   }
   .btn-primary { background: var(--blue); color: #fff; }
   .btn-primary:hover { background: var(--blue-dark); }
@@ -78,17 +77,17 @@
   .btn-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
   .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   table { border-collapse: collapse; margin-top: 14px; font-size: 13px; width: max-content; min-width: 100%; }
-  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  th { color: var(--muted); font-weight: bold; background: #fafbfc; white-space: nowrap; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; font-size: 13px; }
+  th { color: var(--muted); font-weight: 600; background: #fafbfc; white-space: nowrap; }
   td.pre-nowrap { white-space: pre; }        /* 保留原本的換行(如多人分行)，但不因欄位窄而逐字折行 */
   td.col-date { width: 90px; min-width: 90px; white-space: nowrap; }
   td.col-company { min-width: 80px; }
   td.col-person { min-width: 80px; }
   .search-big {
-    font-size: 18px; padding: 16px 18px;
+    font-size: 16px; padding: 14px 16px;
   }
-  .result-count { font-size: 14px; color: var(--muted); margin: 10px 0; }
-  .result-count b { color: var(--text); font-size: 16px; }
+  .result-count { font-size: 13px; color: var(--muted); margin: 10px 0; }
+  .result-count b { color: var(--text); font-size: 15px; }
   .hidden { display: none !important; }
   .msg { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-top: 10px; }
   .msg.ok { background: #dcfce7; color: #166534; }
@@ -97,12 +96,12 @@
     max-width: 360px; margin: 100px auto; background: #fff; padding: 30px;
     border-radius: 10px; border: 1px solid var(--border);
   }
-  .login-box h2 { margin-top: 0; }
-  .ai-box { background: #f0f5ff; border: 1px solid #c7d7fe; border-radius: 8px; padding: 14px; margin-top: 14px; }
+  .login-box h2 { margin-top: 0; font-size: 18px; }
   .role-badge {
     display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px;
     background: #e0e7ff; color: #3730a3; margin-left: 6px;
   }
+  h3 { font-size: 15px; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -123,27 +122,30 @@
 <div id="appView" class="hidden">
   <header>
     <div class="title">董事長聯絡事項查詢系統 <span>Contact Records</span></div>
-    <div id="excelActions" class="excel-actions hidden">
-      <input id="excelFile" type="file" accept=".xlsx,.xls" title="選擇 Excel 檔(欄位：日期/公司/單位/人員/內容/備註)" />
-      <button class="btn btn-primary" onclick="importExcel()">匯入（全部覆蓋）</button>
-      <button class="btn btn-outline" onclick="exportExcel()">匯出</button>
-    </div>
     <div class="user-info">
       <span id="userEmailLabel"></span>
       <button onclick="doLogout()">登出</button>
     </div>
   </header>
-  <div id="importMsgWrap" style="max-width:1200px; margin:0 auto; padding:0 16px;"><div id="importMsg"></div></div>
 
   <div class="container">
-    <div class="tabs">
-      <button id="tabBtnQuery" class="active" onclick="switchTab('query')">查詢</button>
-      <button id="tabBtnInput" onclick="switchTab('input')">輸入</button>
-      <button id="tabBtnAdmin" class="hidden" onclick="switchTab('admin')">帳號管理</button>
-      <button id="tabBtnSettings" onclick="switchTab('settings')">帳號設定</button>
+    <div class="toolbar-row">
+      <div class="tabs">
+        <button id="tabBtnQuery" class="active" onclick="switchTab('query')">查詢</button>
+        <button id="tabBtnInput" onclick="switchTab('input')">輸入</button>
+        <button id="tabBtnAdmin" class="hidden" onclick="switchTab('admin')">帳號管理</button>
+        <button id="tabBtnSettings" onclick="switchTab('settings')">帳號設定</button>
+      </div>
+      <div id="excelActions" class="excel-actions hidden">
+        <input id="excelFile" type="file" accept=".xlsx,.xls" title="選擇 Excel 檔(欄位：日期/公司/單位/人員/內容/備註)" />
+        <button class="btn btn-primary" onclick="importExcel()">匯入（全部覆蓋）</button>
+        <button class="btn btn-outline" onclick="exportExcel()">匯出</button>
+      </div>
     </div>
+    <div id="importMsg"></div>
 
     <!-- 查詢畫面 -->
+
     <div id="queryTab" class="card">
       <label>模糊搜尋（姓名 / 公司 / 內容 / 備註，皆可）</label>
       <input id="searchBox" class="search-big" placeholder="輸入關鍵字，例如：陳依梅 或 工研院" onkeydown="if(event.key==='Enter') runSearch()" />
@@ -381,12 +383,22 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
 
+// 有些 Excel 列的「人員」用頓號/逗號分隔多人、有些用換行分隔，格式不一致
+// 統一轉成「每人一行」，畫面上才不會一種是橫列一種是直排
+function normalizePersonList(raw) {
+  return String(raw || '')
+    .split(/[\n、,，]+/)
+    .map(s => s.trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
 // ---------- 輸入畫面：手動新增 ----------
 async function addRecord() {
   const record = {
     record_date: document.getElementById('newDate').value || null,
     company: document.getElementById('newCompany').value.trim(),
-    person: document.getElementById('newPerson').value.trim(),
+    person: normalizePersonList(document.getElementById('newPerson').value),
     content: document.getElementById('newContent').value.trim(),
     note: document.getElementById('newNote').value.trim(),
     uploaded_by: currentUser.email
@@ -452,7 +464,7 @@ async function importExcel() {
     return {
       record_date: recordDate,
       company: String(row['公司/單位'] || row['公司'] || '').trim(),
-      person: String(row['人員'] || row['姓名'] || '').trim(),
+      person: normalizePersonList(row['人員'] || row['姓名'] || ''),
       content: String(row['內容'] || '').trim(),
       note: String(row['備註'] || row['陪同人員'] || '').trim(),
       uploaded_by: currentUser.email
@@ -580,4 +592,3 @@ async function changePassword() {
 </script>
 </body>
 </html>
-
