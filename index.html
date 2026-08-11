@@ -610,7 +610,12 @@ async function importExcel() {
       const dateVal = row['日期'];
       let recordDate = null;
       if (dateVal instanceof Date) {
-        recordDate = dateVal.toISOString().slice(0, 10);
+        // 用「當地時間」的年月日組字串，不要用 toISOString()：
+        // toISOString() 會先轉成 UTC 時間，台灣是 UTC+8，換算後日期會往前跳一天
+        const y = dateVal.getFullYear();
+        const m = String(dateVal.getMonth() + 1).padStart(2, '0');
+        const d = String(dateVal.getDate()).padStart(2, '0');
+        recordDate = `${y}-${m}-${d}`;
       } else if (typeof dateVal === 'string' && dateVal.trim()) {
         recordDate = dateVal.trim();
       }
