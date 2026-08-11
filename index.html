@@ -31,15 +31,19 @@
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 12px;
+    row-gap: 10px;
   }
-  header .title { font-size: 18px; font-weight: bold; }
+  header .title { font-size: 18px; font-weight: bold; white-space: nowrap; }
   header .title span { color: #9fb4ff; font-weight: normal; font-size: 14px; margin-left: 8px; }
-  header .excel-actions { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-  header .excel-actions input[type=file] {
-    color: #cbd5e1; font-size: 12px; max-width: 160px;
+  header .excel-actions {
+    display: flex; align-items: center; gap: 8px; font-size: 13px;
+    background: rgba(255,255,255,0.06); padding: 6px 10px; border-radius: 8px;
+    order: 3; width: 100%; justify-content: flex-start;
   }
-  header .excel-actions .btn { padding: 7px 12px; font-size: 12px; }
+  header .excel-actions input[type=file] {
+    color: #cbd5e1; font-size: 12px; max-width: 180px;
+  }
+  header .excel-actions .btn { padding: 7px 12px; font-size: 12px; white-space: nowrap; }
   header .user-info { display: flex; align-items: center; gap: 16px; font-size: 14px; }
   header .user-info button {
     background: #b91c1c; color: #fff; border: none; padding: 6px 14px;
@@ -76,11 +80,10 @@
   table { border-collapse: collapse; margin-top: 14px; font-size: 13px; width: max-content; min-width: 100%; }
   th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
   th { color: var(--muted); font-weight: bold; background: #fafbfc; white-space: nowrap; }
-  td.pre { white-space: pre-wrap; }         /* 人員/公司：保留換行，並在窄欄內自動折行 */
-  td.pre-nowrap { white-space: pre; }       /* 內容/備註：保留換行，但不折行，超出用橫向捲動看 */
+  td.pre-nowrap { white-space: pre; }        /* 保留原本的換行(如多人分行)，但不因欄位窄而逐字折行 */
   td.col-date { width: 90px; min-width: 90px; white-space: nowrap; }
-  td.col-company { width: 64px; min-width: 64px; max-width: 64px; }
-  td.col-person { width: 54px; min-width: 54px; max-width: 54px; }
+  td.col-company { min-width: 80px; }
+  td.col-person { min-width: 80px; }
   .search-big {
     font-size: 18px; padding: 16px 18px;
   }
@@ -164,7 +167,7 @@
       <div class="table-wrap">
       <table>
         <thead>
-          <tr><th style="width:90px">日期</th><th style="width:64px">公司/單位</th><th style="width:54px">人員</th><th>內容</th><th>備註</th></tr>
+          <tr><th style="width:90px">日期</th><th style="min-width:80px">公司/單位</th><th style="min-width:80px">人員</th><th>內容</th><th>備註</th></tr>
         </thead>
         <tbody id="resultsBody"></tbody>
       </table>
@@ -196,7 +199,7 @@
       <div class="table-wrap">
       <table>
         <thead>
-          <tr><th style="width:90px">日期</th><th style="width:64px">公司/單位</th><th style="width:54px">人員</th><th>內容</th><th>備註</th><th style="width:60px">刪除</th></tr>
+          <tr><th style="width:90px">日期</th><th style="min-width:80px">公司/單位</th><th style="min-width:80px">人員</th><th>內容</th><th>備註</th><th style="width:60px">刪除</th></tr>
         </thead>
         <tbody id="allBody"></tbody>
       </table>
@@ -358,8 +361,8 @@ async function runSearch() {
   body.innerHTML = lastSearchResults.map(r => `
     <tr>
       <td class="col-date">${r.record_date || ''}</td>
-      <td class="pre col-company">${escapeHtml(r.company)}</td>
-      <td class="pre col-person">${escapeHtml(r.person)}</td>
+      <td class="pre-nowrap col-company">${escapeHtml(r.company)}</td>
+      <td class="pre-nowrap col-person">${escapeHtml(r.person)}</td>
       <td class="pre-nowrap">${escapeHtml(r.content)}</td>
       <td class="pre-nowrap">${escapeHtml(r.note)}</td>
     </tr>
@@ -408,8 +411,8 @@ async function refreshAllRecords() {
   body.innerHTML = data.map(r => `
     <tr>
       <td class="col-date">${r.record_date || ''}</td>
-      <td class="pre col-company">${escapeHtml(r.company)}</td>
-      <td class="pre col-person">${escapeHtml(r.person)}</td>
+      <td class="pre-nowrap col-company">${escapeHtml(r.company)}</td>
+      <td class="pre-nowrap col-person">${escapeHtml(r.person)}</td>
       <td class="pre-nowrap">${escapeHtml(r.content)}</td>
       <td class="pre-nowrap">${escapeHtml(r.note)}</td>
       <td><button class="btn btn-danger" onclick="deleteRecord('${r.id}')">刪除</button></td>
@@ -577,3 +580,4 @@ async function changePassword() {
 </script>
 </body>
 </html>
+
