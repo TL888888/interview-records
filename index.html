@@ -91,11 +91,12 @@
   .table-wrap { overflow-x: auto; overflow-y: auto; max-height: 65vh; -webkit-overflow-scrolling: touch; }
   table { border-collapse: collapse; margin-top: 14px; font-size: 15px; width: max-content; min-width: 100%; }
   th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--border); vertical-align: top; font-size: 15px; line-height: 1.6; }
-  th { color: var(--muted); font-weight: 600; background: #fafbfc; white-space: nowrap; font-size: 13px; text-align: center; position: sticky; top: 0; z-index: 5; box-shadow: 0 1px 0 var(--border); }
+  th { color: #334155; font-weight: 700; background: #e2e8f0; white-space: nowrap; font-size: 13px; text-align: center; position: sticky; top: 0; z-index: 5; box-shadow: 0 2px 0 #94a3b8; }
   td.pre-nowrap { white-space: pre; }        /* 保留原本的換行(如多人分行)，但不因欄位窄而逐字折行 */
   td.col-date { width: 90px; min-width: 90px; white-space: nowrap; }
   td.col-company { min-width: 80px; max-width: 150px; white-space: pre-wrap; word-break: break-word; }  /* 約10個中文字寬度就換行 */
   td.col-person { min-width: 80px; }
+  td.col-companion { min-width: 80px; }
   td.col-content { max-width: 450px; white-space: pre-wrap; word-break: break-word; }  /* 約30個中文字寬度就換行 */
   .search-big {
     font-size: 16px; padding: 14px 16px;
@@ -166,6 +167,7 @@
         <div><label>人員</label><input id="editPerson" /></div>
       </div>
       <div style="margin-top:14px"><label>內容</label><textarea id="editContent"></textarea></div>
+      <div style="margin-top:14px"><label>陪同人員</label><textarea id="editCompanion"></textarea></div>
       <div style="margin-top:14px"><label>備註</label><textarea id="editNote"></textarea></div>
       <div class="btn-row" style="margin-top:10px">
         <button class="btn btn-primary" onclick="saveEditRecord()">儲存</button>
@@ -215,7 +217,7 @@
       <div class="table-wrap">
       <table>
         <thead>
-          <tr><th style="width:90px">日期</th><th style="min-width:80px">公司/單位</th><th style="min-width:80px">人員</th><th>內容</th><th>備註</th></tr>
+          <tr><th style="width:90px">日期</th><th style="min-width:80px">公司/單位</th><th style="min-width:80px">人員</th><th>內容</th><th style="min-width:80px">陪同人員</th><th>備註</th></tr>
         </thead>
         <tbody id="resultsBody"></tbody>
       </table>
@@ -232,6 +234,7 @@
         <div><label>人員</label><input id="newPerson" /></div>
       </div>
       <div style="margin-top:14px"><label>內容</label><textarea id="newContent"></textarea></div>
+      <div style="margin-top:14px"><label>陪同人員</label><textarea id="newCompanion"></textarea></div>
       <div style="margin-top:14px"><label>備註</label><textarea id="newNote"></textarea></div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="addRecord()">新增這筆</button>
@@ -248,7 +251,7 @@
       <div class="table-wrap">
       <table>
         <thead>
-          <tr><th style="width:90px">日期</th><th style="min-width:80px">公司/單位</th><th style="min-width:80px">人員</th><th>內容</th><th>備註</th><th style="width:130px">操作</th></tr>
+          <tr><th style="width:90px">日期</th><th style="min-width:80px">公司/單位</th><th style="min-width:80px">人員</th><th>內容</th><th style="min-width:80px">陪同人員</th><th>備註</th><th style="width:130px">操作</th></tr>
         </thead>
         <tbody id="allBody"></tbody>
       </table>
@@ -412,7 +415,7 @@ async function runSearch() {
   if (dateTo) query = query.lte('record_date', dateTo);
   if (keyword) {
     const like = `%${keyword}%`;
-    query = query.or(`company.ilike.${like},person.ilike.${like},content.ilike.${like},note.ilike.${like}`);
+    query = query.or(`company.ilike.${like},person.ilike.${like},content.ilike.${like},companion.ilike.${like},note.ilike.${like}`);
   }
 
   const { data, error } = await query;
@@ -438,6 +441,7 @@ function renderResultsPage() {
       <td class="pre-nowrap col-company">${escapeHtml(r.company)}</td>
       <td class="pre-nowrap col-person">${escapeHtml(r.person)}</td>
       <td class="col-content">${escapeHtml(r.content)}</td>
+      <td class="pre-nowrap col-companion">${escapeHtml(r.companion)}</td>
       <td class="pre-nowrap">${escapeHtml(r.note)}</td>
     </tr>
   `).join('');
@@ -474,6 +478,7 @@ async function addRecord() {
     company: document.getElementById('newCompany').value.trim(),
     person: normalizePersonList(document.getElementById('newPerson').value),
     content: document.getElementById('newContent').value.trim(),
+    companion: document.getElementById('newCompanion').value.trim(),
     note: document.getElementById('newNote').value.trim(),
     uploaded_by: currentUser.email
   };
@@ -484,7 +489,7 @@ async function addRecord() {
     return;
   }
   msgEl.innerHTML = `<div class="msg ok">新增成功</div>`;
-  ['newDate','newCompany','newPerson','newContent','newNote'].forEach(id => document.getElementById(id).value = '');
+  ['newDate','newCompany','newPerson','newContent','newCompanion','newNote'].forEach(id => document.getElementById(id).value = '');
   refreshAllRecords();
   runSearch();
 }
@@ -509,6 +514,7 @@ function renderAllPage() {
       <td class="pre-nowrap col-company">${escapeHtml(r.company)}</td>
       <td class="pre-nowrap col-person">${escapeHtml(r.person)}</td>
       <td class="col-content">${escapeHtml(r.content)}</td>
+      <td class="pre-nowrap col-companion">${escapeHtml(r.companion)}</td>
       <td class="pre-nowrap">${escapeHtml(r.note)}</td>
       <td>
         <div style="display:flex; gap:6px;">
@@ -541,6 +547,7 @@ function openEditRecord(id) {
   document.getElementById('editCompany').value = r.company || '';
   document.getElementById('editPerson').value = r.person || '';
   document.getElementById('editContent').value = r.content || '';
+  document.getElementById('editCompanion').value = r.companion || '';
   document.getElementById('editNote').value = r.note || '';
   document.getElementById('editMsg').innerHTML = '';
   document.getElementById('editBox').classList.remove('hidden');
@@ -559,6 +566,7 @@ async function saveEditRecord() {
     company: document.getElementById('editCompany').value.trim(),
     person: normalizePersonList(document.getElementById('editPerson').value),
     content: document.getElementById('editContent').value.trim(),
+    companion: document.getElementById('editCompanion').value.trim(),
     note: document.getElementById('editNote').value.trim()
   };
   const { error } = await sb.from('interview_records').update(updated).eq('id', editingRecordId);
@@ -611,13 +619,11 @@ async function importExcel() {
         company: String(row['公司/單位'] || row['公司'] || '').trim(),
         person: normalizePersonList(row['人員'] || row['姓名'] || ''),
         content: String(row['內容'] || '').trim(),
-        note: [
-          String(row['陪同人員'] || '').trim() ? '陪同人員：' + String(row['陪同人員']).trim() : '',
-          String(row['備註'] || '').trim() ? '備註：' + String(row['備註']).trim() : ''
-        ].filter(Boolean).join('\n'),
+        companion: String(row['陪同人員'] || '').trim(),
+        note: String(row['備註'] || '').trim(),
         uploaded_by: currentUser.email
       };
-    }).filter(r => r.record_date || r.person || r.company || r.content || r.note);
+    }).filter(r => r.record_date || r.person || r.company || r.content || r.companion || r.note);
 
     if (sheetRecords.length > 0) {
       sheetSummary.push(`${sheetName}(${sheetRecords.length}筆)`);
@@ -653,6 +659,7 @@ async function exportExcel() {
     '公司/單位': r.company || '',
     '人員': r.person || '',
     '內容': r.content || '',
+    '陪同人員': r.companion || '',
     '備註': r.note || ''
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -773,3 +780,4 @@ async function changePassword() {
 </script>
 </body>
 </html>
+
