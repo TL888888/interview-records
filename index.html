@@ -572,7 +572,10 @@ async function refreshAccounts() {
 const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/interview-admin-user-management`;
 
 async function callAdminFunction(payload) {
-  const { data: { session } } = await sb.auth.getSession();
+  let { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    return { error: '登入狀態已失效，請重新登入後再試一次' };
+  }
   const res = await fetch(EDGE_FUNCTION_URL, {
     method: 'POST',
     headers: {
