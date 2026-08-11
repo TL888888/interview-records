@@ -133,12 +133,12 @@
     </div>
   </header>
 
-  <div id="pwdBox" class="hidden" style="max-width:1200px; margin:12px auto 0; padding:0 16px;">
-    <div class="card" style="max-width:420px; padding:16px 20px;">
-      <div class="grid">
-        <div><label>新密碼</label><input id="newPassword1" type="password" placeholder="至少 6 碼" /></div>
-        <div><label>再輸入一次</label><input id="newPassword2" type="password" /></div>
-      </div>
+  <div id="pwdBox" class="hidden" style="position:fixed; inset:0; background:rgba(15,27,51,0.4); z-index:50; display:flex; align-items:flex-start; justify-content:center; padding-top:80px;">
+    <div class="card" style="max-width:360px; width:90%; padding:20px 22px; box-shadow:0 10px 30px rgba(0,0,0,0.2);">
+      <h3 style="margin-top:0">修改密碼</h3>
+      <label>新密碼</label><input id="newPassword1" type="password" placeholder="至少 6 碼" />
+      <div style="height:10px"></div>
+      <label>再輸入一次</label><input id="newPassword2" type="password" />
       <div class="btn-row" style="margin-top:10px">
         <button class="btn btn-primary" onclick="changePassword()">更新密碼</button>
         <button class="btn btn-outline" onclick="togglePwdBox()">取消</button>
@@ -213,7 +213,7 @@
       <hr style="margin:24px 0; border:none; border-top:1px solid var(--border)" />
 
       <p style="font-size:13px; color:var(--muted)">
-        Excel 匯入 / 匯出已移到頁面右上角。匯入採「全部覆蓋」：上傳的 Excel 必須包含完整的歷史資料，欄位需為：日期、公司/單位、人員、內容、備註。
+        Excel 匯入 / 匯出已移到頁面右上角。匯入採「全部覆蓋」：上傳的 Excel 必須包含完整的歷史資料，欄位需為：日期、公司/單位、人員、內容、備註。若檔案裡有多個工作表，會自動全部讀取合併，不用逐一匯入。
       </p>
 
       <h3>目前全部資料（<span id="allCount">-</span> 筆，最新在上）</h3>
@@ -367,6 +367,9 @@ function switchTab(tab) {
 
 function togglePwdBox() {
   document.getElementById('pwdBox').classList.toggle('hidden');
+  document.getElementById('newPassword1').value = '';
+  document.getElementById('newPassword2').value = '';
+  document.getElementById('pwdMsg').innerHTML = '';
 }
 
 // ---------- 查詢 ----------
@@ -504,26 +507,37 @@ async function importExcel() {
   const file = fileInput.files[0];
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array', cellDates: true });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-  const records = rows.map(row => {
-    const dateVal = row['日期'];
-    let recordDate = null;
-    if (dateVal instanceof Date) {
-      recordDate = dateVal.toISOString().slice(0, 10);
-    } else if (typeof dateVal === 'string' && dateVal.trim()) {
-      recordDate = dateVal.trim();
+  // 支援多個工作表：把每一個工作表的資料都讀出來，合併成一份清單
+  let records = [];
+  let sheetSummary = [];
+  wb.SheetNames.forEach(sheetName => {
+    const ws = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+    const sheetRecords = rows.map(row => {
+      const dateVal = row['日期'];
+      let recordDate = null;
+      if (dateVal instanceof Date) {
+        recordDate = dateVal.toISOString().slice(0, 10);
+      } else if (typeof dateVal === 'string' && dateVal.trim()) {
+        recordDate = dateVal.trim();
+      }
+      return {
+        record_date: recordDate,
+        company: String(row['公司/單位'] || row['公司'] || '').trim(),
+        person: normalizePersonList(row['人員'] || row['姓名'] || ''),
+        content: String(row['內容'] || '').trim(),
+        note: String(row['備註'] || row['陪同人員'] || '').trim(),
+        uploaded_by: currentUser.email
+      };
+    }).filter(r => r.person || r.company || r.content);
+
+    if (sheetRecords.length > 0) {
+      sheetSummary.push(`${sheetName}(${sheetRecords.length}筆)`);
+      records = records.concat(sheetRecords);
     }
-    return {
-      record_date: recordDate,
-      company: String(row['公司/單位'] || row['公司'] || '').trim(),
-      person: normalizePersonList(row['人員'] || row['姓名'] || ''),
-      content: String(row['內容'] || '').trim(),
-      note: String(row['備註'] || row['陪同人員'] || '').trim(),
-      uploaded_by: currentUser.email
-    };
-  }).filter(r => r.person || r.company || r.content);
+  });
 
   if (records.length === 0) {
     msgEl.innerHTML = `<div class="msg err">Excel 裡讀不到資料，請確認欄位名稱是否為：日期/公司/單位/人員/內容/備註</div>`;
@@ -537,7 +551,7 @@ async function importExcel() {
   const { error: insErr } = await sb.from('interview_records').insert(records);
   if (insErr) { msgEl.innerHTML = `<div class="msg err">寫入失敗：${insErr.message}</div>`; return; }
 
-  msgEl.innerHTML = `<div class="msg ok">匯入成功，共 ${records.length} 筆</div>`;
+  msgEl.innerHTML = `<div class="msg ok">匯入成功，共 ${records.length} 筆（${sheetSummary.join('、')}）</div>`;
   fileInput.value = '';
   refreshAllRecords();
   runSearch();
@@ -631,6 +645,12 @@ async function changePassword() {
   msgEl.innerHTML = `<div class="msg ok">密碼已更新，下次登入請用新密碼</div>`;
   document.getElementById('newPassword1').value = '';
   document.getElementById('newPassword2').value = '';
+
+  // 顯示完成訊息片刻，再自動關閉小視窗，回到原本查詢畫面
+  setTimeout(() => {
+    document.getElementById('pwdBox').classList.add('hidden');
+    msgEl.innerHTML = '';
+  }, 1200);
 }
 
 // ---------- 進站時檢查是否已登入 ----------
