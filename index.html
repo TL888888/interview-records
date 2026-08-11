@@ -520,9 +520,20 @@ async function importExcel() {
   // 支援多個工作表：把每一個工作表的資料都讀出來，合併成一份清單
   let records = [];
   let sheetSummary = [];
+  let skippedSheets = [];
   wb.SheetNames.forEach(sheetName => {
     const ws = wb.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    if (rows.length === 0) return;
+
+    // 檢查這個工作表的欄位是不是「訪談紀錄」格式(有日期/人員/姓名/內容任一個)，
+    // 不是的話代表是其他不相關的表，直接跳過，不要硬湊出一堆只有公司名稱的空白列
+    const headers = Object.keys(rows[0]);
+    const looksLikeInterviewSheet = ['日期', '人員', '姓名', '內容'].some(k => headers.includes(k));
+    if (!looksLikeInterviewSheet) {
+      skippedSheets.push(sheetName);
+      return;
+    }
 
     const sheetRecords = rows.map(row => {
       const dateVal = row['日期'];
@@ -537,7 +548,10 @@ async function importExcel() {
         company: String(row['公司/單位'] || row['公司'] || '').trim(),
         person: normalizePersonList(row['人員'] || row['姓名'] || ''),
         content: String(row['內容'] || '').trim(),
-        note: String(row['備註'] || row['陪同人員'] || '').trim(),
+        note: [
+          String(row['陪同人員'] || '').trim() ? '陪同人員：' + String(row['陪同人員']).trim() : '',
+          String(row['備註'] || '').trim() ? '備註：' + String(row['備註']).trim() : ''
+        ].filter(Boolean).join('\n'),
         uploaded_by: currentUser.email
       };
     }).filter(r => r.person || r.company || r.content);
@@ -560,7 +574,8 @@ async function importExcel() {
   const { error: insErr } = await sb.from('interview_records').insert(records);
   if (insErr) { msgEl.innerHTML = `<div class="msg err">寫入失敗：${insErr.message}</div>`; return; }
 
-  msgEl.innerHTML = `<div class="msg ok">匯入成功，共 ${records.length} 筆（${sheetSummary.join('、')}）</div>`;
+  const skippedNote = skippedSheets.length > 0 ? `，已跳過非訪談格式的工作表：${skippedSheets.join('、')}` : '';
+  msgEl.innerHTML = `<div class="msg ok">匯入成功，共 ${records.length} 筆（${sheetSummary.join('、')}）${skippedNote}</div>`;
   fileInput.value = '';
   refreshAllRecords();
   runSearch();
@@ -591,18 +606,35 @@ async function refreshAccounts() {
   body.innerHTML = data.map(a => `
     <tr>
       <td>${escapeHtml(a.email)}</td>
-      <td>${a.role}</td>
+      <td>
+        <select onchange="updateAccountRole('${a.email}', this.value)" style="padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:13px;">
+          <option value="admin" ${a.role === 'admin' ? 'selected' : ''}>admin</option>
+          <option value="viewer" ${a.role === 'viewer' ? 'selected' : ''}>viewer</option>
+        </select>
+      </td>
       <td><button class="btn btn-danger" onclick="deleteAccount('${a.email}')">移除</button></td>
     </tr>
   `).join('');
 }
 
+async function updateAccountRole(email, newRole) {
+  const { error } = await sb.from('interview_access').update({ role: newRole }).eq('email', email);
+  if (error) { alert('角色更新失敗：' + error.message); refreshAccounts(); return; }
+  refreshAccounts();
+}
+
 const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/interview-admin-user-management`;
 
 async function callAdminFunction(payload) {
-  let { data: { session } } = await sb.auth.getSession();
+  // 先強制刷新一次登入憑證，避免 access token 過期造成呼叫失敗
+  const { data: refreshed } = await sb.auth.refreshSession();
+  let session = refreshed?.session;
   if (!session) {
-    return { error: '登入狀態已失效，請重新登入後再試一次' };
+    const { data } = await sb.auth.getSession();
+    session = data.session;
+  }
+  if (!session) {
+    return { error: '登入狀態已失效，請重新整理頁面、重新登入後再試一次' };
   }
   const res = await fetch(EDGE_FUNCTION_URL, {
     method: 'POST',
