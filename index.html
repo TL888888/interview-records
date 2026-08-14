@@ -95,7 +95,7 @@
   td.pre-nowrap { white-space: pre; }        /* 保留原本的換行(如多人分行)，但不因欄位窄而逐字折行 */
   td.col-date { width: 90px; min-width: 90px; white-space: nowrap; }
   td.col-company { min-width: 80px; max-width: 150px; white-space: pre-wrap; word-break: break-word; }  /* 約10個中文字寬度就換行 */
-  td.col-person { min-width: 80px; }
+  td.col-person { min-width: 80px; white-space: pre-wrap; word-break: break-word; }
   td.col-companion { min-width: 80px; max-width: 150px; white-space: pre-wrap; word-break: break-word; }
   td.col-content { max-width: 450px; white-space: pre-wrap; word-break: break-word; }  /* 約30個中文字寬度就換行 */
   td.col-note { white-space: pre-wrap; word-break: break-word; }
@@ -129,6 +129,9 @@
   @media (max-width: 640px) {
     header { position: relative; }
     header .user-info button#logoutBtn { position: absolute; top: 10px; right: 14px; }
+    .container { padding: 0 6px; }
+    .card { padding: 14px 10px; }
+    th, td { padding: 10px 6px; }
     .search-row { flex-direction: column; }
     .search-row-keyword, .search-date-pair { width: 100%; }
     .search-date-pair { gap: 10px; }
@@ -136,7 +139,8 @@
     .search-btn-row { gap: 8px; }
     .result-count { font-size: 12px; }
     td.col-company { max-width: 90px; }   /* 約5個中文字寬度就換行 */
-    td.col-content { max-width: 380px; }  /* 約25個中文字寬度就換行 */
+    td.col-person { max-width: 110px; }   /* 約6個中文字寬度就換行 */
+    td.col-content { max-width: 480px; }  /* 約30個中文字寬度就換行，把省下的寬度留給內容 */
     td.col-companion { max-width: 60px; } /* 約3個中文字寬度就換行 */
     td.col-note { max-width: 100px; }     /* 約6個中文字寬度就換行 */
   }
@@ -894,4 +898,5 @@ async function changePassword() {
 </script>
 </body>
 </html>
+
 
