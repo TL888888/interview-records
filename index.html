@@ -96,12 +96,13 @@
   td.col-date { width: 90px; min-width: 90px; white-space: nowrap; }
   td.col-company { min-width: 80px; max-width: 150px; white-space: pre-wrap; word-break: break-word; }  /* 約10個中文字寬度就換行 */
   td.col-person { min-width: 80px; }
-  td.col-companion { min-width: 80px; }
+  td.col-companion { min-width: 80px; max-width: 150px; white-space: pre-wrap; word-break: break-word; }
   td.col-content { max-width: 450px; white-space: pre-wrap; word-break: break-word; }  /* 約30個中文字寬度就換行 */
+  td.col-note { white-space: pre-wrap; word-break: break-word; }
   .search-big {
     font-size: 16px; padding: 14px 16px;
   }
-  .result-count { font-size: 13px; color: var(--muted); margin: 10px 0; }
+  .result-count { font-size: 13px; color: var(--muted); margin: 0; white-space: nowrap; }
   .result-count b { color: var(--text); font-size: 15px; }
   .hidden { display: none !important; }
   .msg { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-top: 10px; }
@@ -117,6 +118,21 @@
     background: #e0e7ff; color: #3730a3; margin-left: 6px;
   }
   h3 { font-size: 15px; font-weight: 600; }
+  .search-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
+  .search-row-keyword { flex: 2; min-width: 220px; }
+  .search-row-item { flex: 1; min-width: 150px; }
+  .search-btn-row { align-items: center; }
+  @media (max-width: 640px) {
+    header { position: relative; }
+    header .user-info button#logoutBtn { position: absolute; top: 10px; right: 14px; }
+    .search-btn-row .btn { font-size: 12px; padding: 7px 12px; }
+    .search-btn-row { gap: 8px; }
+    .result-count { font-size: 12px; }
+    td.col-company { max-width: 90px; }   /* 約5個中文字寬度就換行 */
+    td.col-content { max-width: 380px; }  /* 約25個中文字寬度就換行 */
+    td.col-companion { max-width: 60px; } /* 約3個中文字寬度就換行 */
+    td.col-note { max-width: 100px; }     /* 約6個中文字寬度就換行 */
+  }
 </style>
 </head>
 <body>
@@ -128,6 +144,10 @@
   <div style="height:10px"></div>
   <label>密碼</label>
   <input id="loginPassword" type="password" />
+  <div style="display:flex; align-items:center; gap:6px; margin-top:10px;">
+    <input id="rememberEmail" type="checkbox" style="width:15px; height:15px; cursor:pointer;" />
+    <label for="rememberEmail" style="font-size:12px; color:var(--muted); cursor:pointer; margin-bottom:0;">記住我的帳號（只記帳號，密碼每次都要輸入）</label>
+  </div>
   <div class="btn-row">
     <button class="btn btn-primary" style="width:100%" onclick="doLogin()">登入</button>
   </div>
@@ -140,7 +160,7 @@
     <div class="user-info">
       <span id="userEmailLabel"></span>
       <a href="javascript:void(0)" onclick="togglePwdBox()" style="color:#cbd5e1; font-size:13px; text-decoration:underline;">修改密碼</a>
-      <button onclick="doLogout()">登出</button>
+      <button onclick="doLogout()" id="logoutBtn">登出</button>
     </div>
   </header>
 
@@ -195,23 +215,25 @@
     <!-- 查詢畫面 -->
 
     <div id="queryTab" class="card">
-      <label>模糊搜尋（姓名 / 公司 / 內容 / 備註，皆可）</label>
-      <input id="searchBox" class="search-big" placeholder="輸入關鍵字，例如：陳依梅 或 工研院" onkeydown="if(event.key==='Enter') runSearch()" />
-      <div class="grid" style="margin-top:14px">
-        <div>
+      <div class="search-row">
+        <div class="search-row-keyword">
+          <label>模糊搜尋（姓名 / 公司 / 內容 / 備註，皆可）</label>
+          <input id="searchBox" class="search-big" placeholder="輸入關鍵字，例如：陳依梅 或 工研院" onkeydown="if(event.key==='Enter') runSearch()" />
+        </div>
+        <div class="search-row-item">
           <label>開始日期</label>
           <input id="filterDateFrom" type="date" />
         </div>
-        <div>
+        <div class="search-row-item">
           <label>結束日期</label>
           <input id="filterDateTo" type="date" />
         </div>
       </div>
-      <div class="btn-row">
+      <div class="btn-row search-btn-row">
         <button class="btn btn-primary" onclick="runSearch()">🔍 檢索</button>
         <button class="btn btn-outline" onclick="clearSearch()">清除條件</button>
+        <div class="result-count">搜尋總筆數：<b id="resultCount">-</b> 筆</div>
       </div>
-      <div class="result-count">搜尋總筆數：<b id="resultCount">-</b> 筆</div>
 
 
       <div class="table-wrap">
@@ -353,6 +375,14 @@ async function doLogin() {
 
   currentUser = data.user;
   currentRole = access.role;
+
+  // 依「記住我的帳號」勾選狀態，決定要不要把email存在瀏覽器localStorage(只存帳號，密碼不存)
+  if (document.getElementById('rememberEmail').checked) {
+    localStorage.setItem('interview_records_remembered_email', email);
+  } else {
+    localStorage.removeItem('interview_records_remembered_email');
+  }
+
   enterApp();
 }
 
@@ -442,7 +472,7 @@ function renderResultsPage() {
       <td class="pre-nowrap col-person">${escapeHtml(r.person)}</td>
       <td class="col-content">${escapeHtml(r.content)}</td>
       <td class="pre-nowrap col-companion">${escapeHtml(r.companion)}</td>
-      <td class="pre-nowrap">${escapeHtml(r.note)}</td>
+      <td class="col-note">${escapeHtml(r.note)}</td>
     </tr>
   `).join('');
 
@@ -515,7 +545,7 @@ function renderAllPage() {
       <td class="pre-nowrap col-person">${escapeHtml(r.person)}</td>
       <td class="col-content">${escapeHtml(r.content)}</td>
       <td class="pre-nowrap col-companion">${escapeHtml(r.companion)}</td>
-      <td class="pre-nowrap">${escapeHtml(r.note)}</td>
+      <td class="col-note">${escapeHtml(r.note)}</td>
       <td>
         <div style="display:flex; gap:6px;">
           <button class="btn btn-outline" style="padding:6px 10px; font-size:12px;" onclick="openEditRecord('${r.id}')">編輯</button>
@@ -771,6 +801,13 @@ async function changePassword() {
 
 // ---------- 進站時檢查是否已登入 ----------
 (async () => {
+  // 帶出上次「記住的帳號」（只有帳號，密碼從來不存，每次都要手動輸入）
+  const rememberedEmail = localStorage.getItem('interview_records_remembered_email');
+  if (rememberedEmail) {
+    document.getElementById('loginEmail').value = rememberedEmail;
+    document.getElementById('rememberEmail').checked = true;
+  }
+
   const { data } = await sb.auth.getSession();
   if (data.session) {
     const email = data.session.user.email;
@@ -785,3 +822,4 @@ async function changePassword() {
 </script>
 </body>
 </html>
+
