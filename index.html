@@ -122,6 +122,8 @@
   .search-row-keyword { flex: 2; min-width: 220px; }
   .search-row-item { flex: 1; min-width: 150px; }
   .search-btn-row { align-items: center; }
+  .input-row2 { display: flex; gap: 14px; margin-top: 14px; flex-wrap: wrap; }
+  .input-row2 > div { min-width: 150px; }
   @media (max-width: 640px) {
     header { position: relative; }
     header .user-info button#logoutBtn { position: absolute; top: 10px; right: 14px; }
@@ -144,6 +146,53 @@
   <div style="height:10px"></div>
   <label>密碼</label>
   <input id="loginPassword" type="password" />
+  <div id="monkeyToggle" style="display:flex; flex-direction:column; align-items:center; margin-top:8px;">
+    <button type="button" onclick="toggleMonkey()" style="background:none; border:none; cursor:pointer; padding:4px; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform='scale(1)'">
+      <svg id="monkeySvg" width="56" height="64" viewBox="0 0 72 80">
+        <circle cx="9" cy="36" r="9" fill="#c8853a"/>
+        <circle cx="9" cy="36" r="5.5" fill="#e8a96a"/>
+        <circle cx="63" cy="36" r="9" fill="#c8853a"/>
+        <circle cx="63" cy="36" r="5.5" fill="#e8a96a"/>
+        <ellipse cx="36" cy="62" rx="16" ry="14" fill="#c8853a"/>
+        <ellipse cx="36" cy="64" rx="9" ry="9" fill="#e8a96a"/>
+        <ellipse cx="36" cy="28" rx="21" ry="21" fill="#c8853a"/>
+        <ellipse cx="36" cy="32" rx="14" ry="11" fill="#e8a96a"/>
+        <ellipse cx="36" cy="35" rx="4.5" ry="3.5" fill="#b06828"/>
+        <circle cx="34" cy="35" r="1.4" fill="#7a3f10"/>
+        <circle cx="38" cy="35" r="1.4" fill="#7a3f10"/>
+        <path id="mkMouthN" d="M30 40 Q36 43 42 40" stroke="#7a3f10" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+        <path id="mkMouthS" d="M30 40 Q36 46 42 40" stroke="#7a3f10" stroke-width="1.8" fill="none" stroke-linecap="round" style="display:none"/>
+        <g id="mkEyes" style="display:none">
+          <circle cx="26" cy="26" r="5.5" fill="white"/>
+          <circle cx="46" cy="26" r="5.5" fill="white"/>
+          <circle cx="26" cy="27" r="3.2" fill="#3a2010"/>
+          <circle cx="46" cy="27" r="3.2" fill="#3a2010"/>
+          <circle cx="27" cy="26" r="1.2" fill="white"/>
+          <circle cx="47" cy="26" r="1.2" fill="white"/>
+        </g>
+        <g id="mkHands">
+          <ellipse cx="18" cy="24" rx="9" ry="7" fill="#c8853a" transform="rotate(-20,18,24)"/>
+          <circle cx="11" cy="20" r="4" fill="#c8853a"/>
+          <circle cx="15" cy="18" r="4" fill="#c8853a"/>
+          <circle cx="19" cy="17" r="4" fill="#c8853a"/>
+          <circle cx="23" cy="19" r="4" fill="#c8853a"/>
+          <ellipse cx="54" cy="24" rx="9" ry="7" fill="#c8853a" transform="rotate(20,54,24)"/>
+          <circle cx="61" cy="20" r="4" fill="#c8853a"/>
+          <circle cx="57" cy="18" r="4" fill="#c8853a"/>
+          <circle cx="53" cy="17" r="4" fill="#c8853a"/>
+          <circle cx="49" cy="19" r="4" fill="#c8853a"/>
+        </g>
+        <g id="mkBanana" style="display:none">
+          <path d="M50 56 Q64 48 66 36" stroke="#c8853a" stroke-width="8" fill="none" stroke-linecap="round"/>
+          <path d="M60 16 Q75 22 72 38 Q70 46 64 43 Q52 38 55 22 Q57 14 60 16Z" fill="#f5d020"/>
+          <path d="M60 16 Q58 11 61 10" stroke="#8b6914" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+          <path d="M72 38 Q76 43 74 46" stroke="#8b6914" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+          <path d="M62 18 Q73 24 70 36" stroke="rgba(255,255,255,0.5)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        </g>
+      </svg>
+    </button>
+    <div id="mkLabel" style="font-size:11px; color:var(--muted); margin-top:2px;">點我顯示密碼</div>
+  </div>
   <div style="display:flex; align-items:center; gap:6px; margin-top:10px;">
     <input id="rememberEmail" type="checkbox" style="width:15px; height:15px; cursor:pointer;" />
     <label for="rememberEmail" style="font-size:12px; color:var(--muted); cursor:pointer; margin-bottom:0;">記住我的帳號（只記帳號，密碼每次都要輸入）</label>
@@ -254,10 +303,12 @@
         <div><label>日期</label><input id="newDate" type="date" /></div>
         <div><label>公司/單位</label><input id="newCompany" /></div>
         <div><label>人員</label><input id="newPerson" /></div>
+        <div><label>陪同人員</label><input id="newCompanion" /></div>
       </div>
-      <div style="margin-top:14px"><label>內容</label><textarea id="newContent"></textarea></div>
-      <div style="margin-top:14px"><label>陪同人員</label><textarea id="newCompanion"></textarea></div>
-      <div style="margin-top:14px"><label>備註</label><textarea id="newNote"></textarea></div>
+      <div class="input-row2">
+        <div style="flex:3"><label>內容</label><textarea id="newContent"></textarea></div>
+        <div style="flex:1"><label>備註</label><textarea id="newNote"></textarea></div>
+      </div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="addRecord()">新增這筆</button>
       </div>
@@ -349,6 +400,18 @@ function renderPager(containerId, totalItems, page, onPageChange) {
 }
 
 // ---------- 登入 / 登出 ----------
+var mkShowing = false;
+function toggleMonkey() {
+  mkShowing = !mkShowing;
+  document.getElementById('loginPassword').type = mkShowing ? 'text' : 'password';
+  document.getElementById('mkHands').style.display = mkShowing ? 'none' : '';
+  document.getElementById('mkEyes').style.display = mkShowing ? '' : 'none';
+  document.getElementById('mkBanana').style.display = mkShowing ? '' : 'none';
+  document.getElementById('mkMouthS').style.display = mkShowing ? '' : 'none';
+  document.getElementById('mkMouthN').style.display = mkShowing ? 'none' : '';
+  document.getElementById('mkLabel').textContent = mkShowing ? '點我隱藏密碼' : '點我顯示密碼';
+}
+
 async function doLogin() {
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
