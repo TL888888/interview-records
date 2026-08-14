@@ -121,12 +121,17 @@
   .search-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
   .search-row-keyword { flex: 2; min-width: 220px; }
   .search-row-item { flex: 1; min-width: 150px; }
+  .search-date-pair { display: flex; gap: 14px; flex: 2; min-width: 220px; }
+  .search-date-pair .search-row-item { min-width: 0; }
   .search-btn-row { align-items: center; }
   .input-row2 { display: flex; gap: 14px; margin-top: 14px; flex-wrap: wrap; }
   .input-row2 > div { min-width: 150px; }
   @media (max-width: 640px) {
     header { position: relative; }
     header .user-info button#logoutBtn { position: absolute; top: 10px; right: 14px; }
+    .search-row { flex-direction: column; }
+    .search-row-keyword, .search-date-pair { width: 100%; }
+    .search-date-pair { gap: 10px; }
     .search-btn-row .btn { font-size: 12px; padding: 7px 12px; }
     .search-btn-row { gap: 8px; }
     .result-count { font-size: 12px; }
@@ -269,13 +274,15 @@
           <label>模糊搜尋（姓名 / 公司 / 內容 / 備註，皆可）</label>
           <input id="searchBox" class="search-big" placeholder="輸入關鍵字，例如：陳依梅 或 工研院" onkeydown="if(event.key==='Enter') runSearch()" />
         </div>
-        <div class="search-row-item">
-          <label>開始日期</label>
-          <input id="filterDateFrom" type="date" />
-        </div>
-        <div class="search-row-item">
-          <label>結束日期</label>
-          <input id="filterDateTo" type="date" />
+        <div class="search-date-pair">
+          <div class="search-row-item">
+            <label>開始日期</label>
+            <input id="filterDateFrom" type="date" />
+          </div>
+          <div class="search-row-item">
+            <label>結束日期</label>
+            <input id="filterDateTo" type="date" />
+          </div>
         </div>
       </div>
       <div class="btn-row search-btn-row">
@@ -470,7 +477,7 @@ function enterApp() {
 
   if (currentRole === 'admin') {
     document.getElementById('tabBtnAdmin').classList.remove('hidden');
-    document.getElementById('excelActions').classList.remove('hidden');
+    // 匯入/匯出區塊是否顯示，交給 switchTab 依「目前在哪個分頁」判斷，這裡不主動顯示
   } else {
     // viewer：直接隱藏「輸入」分頁，不讓 viewer 看到一堆反白不能用的欄位
     document.getElementById('tabBtnInput').classList.add('hidden');
@@ -487,6 +494,8 @@ function switchTab(tab) {
     document.getElementById(t + 'Tab').classList.toggle('hidden', t !== tab);
     document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
   });
+  // 匯入/匯出只跟「輸入」分頁有關，查詢分頁不需要看到，避免佔用查詢畫面空間
+  document.getElementById('excelActions').classList.toggle('hidden', !(tab === 'input' && currentRole === 'admin'));
 }
 
 function togglePwdBox() {
