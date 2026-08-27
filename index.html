@@ -118,6 +118,22 @@
     background: #e0e7ff; color: #3730a3; margin-left: 6px;
   }
   h3 { font-size: 15px; font-weight: 600; }
+  /* ══ AI問答：可拖曳、可縮放的浮動視窗 ══ */
+  .ai-widget-box { position: fixed; background: #fff; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 20px 50px rgba(15,27,51,0.28); display: flex; flex-direction: column; z-index: 300; opacity: 0; transform: scale(0.92); pointer-events: none; transition: opacity 0.22s ease, transform 0.22s ease; overflow: hidden; }
+  .ai-widget-box.open { opacity: 1; transform: scale(1); pointer-events: auto; }
+  .ai-widget-box.dragging, .ai-widget-box.resizing { transition: none; }
+  .ai-widget-header { background: var(--navy); color: #fff; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; cursor: move; user-select: none; flex-shrink: 0; }
+  .ai-widget-icon-btn { background: none; border: none; color: rgba(255,255,255,0.85); cursor: pointer; padding: 5px; font-size: 13px; border-radius: 5px; }
+  .ai-widget-icon-btn:hover { color: #fff; background: rgba(255,255,255,0.15); }
+  .ai-widget-body { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--bg); }
+  .ai-widget-resize-handle { position: absolute; right: 2px; bottom: 2px; width: 18px; height: 18px; cursor: nwse-resize; color: #cbd5e1; display: flex; align-items: flex-end; justify-content: flex-end; padding: 2px; }
+  .ai-widget-resize-handle:hover { color: var(--blue); }
+  .ai-bubble-user { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+  .ai-bubble-ai { display: flex; justify-content: flex-start; margin-bottom: 10px; }
+  .ai-bubble-user > div { max-width: 85%; padding: 9px 13px; border-radius: 10px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; background: var(--blue); color: #fff; }
+  .ai-bubble-ai > div { max-width: 85%; padding: 9px 13px; border-radius: 10px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; background: #fff; border: 1px solid var(--border); color: var(--text); }
+  .ai-nav-btn { background: none; border: none; color: #9fb4ff; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px; padding: 4px 2px; }
+  .ai-nav-btn:hover { color: #fff; }
   .search-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
   .search-row-keyword { flex: 2; min-width: 220px; }
   .search-row-item { flex: 1; min-width: 150px; }
@@ -216,6 +232,7 @@
   <header>
     <div class="title">董事長聯絡事項查詢系統 <span>Contact Records</span></div>
     <div class="user-info">
+      <button class="ai-nav-btn" onclick="openAiQa()">🤖 問問AI</button>
       <span id="userEmailLabel"></span>
       <a href="javascript:void(0)" onclick="togglePwdBox()" style="color:#cbd5e1; font-size:13px; text-decoration:underline;">修改密碼</a>
       <button onclick="doLogout()" id="logoutBtn">登出</button>
@@ -253,6 +270,30 @@
       </div>
       <div id="editMsg"></div>
     </div>
+  </div>
+
+  <!-- ══ AI問答：可拖曳、可縮放浮動視窗 ══ -->
+  <div id="ai-qa-modal" class="ai-widget-box">
+    <div id="ai-qa-drag-header" class="ai-widget-header">
+      <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+        <span style="font-size:11px; opacity:0.75;">↕</span>
+        <span>🤖</span>
+        <span style="font-weight:700; font-size:14px; white-space:nowrap;">問問AI</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:2px; flex-shrink:0;">
+        <button onclick="aiWidgetCtrl && aiWidgetCtrl.resetPosition()" title="還原視窗位置與大小" class="ai-widget-icon-btn">⤢</button>
+        <button onclick="closeAiQa()" class="ai-widget-icon-btn" title="關閉" style="font-size:16px;">✕</button>
+      </div>
+    </div>
+    <div class="ai-widget-body">
+      <div style="font-size:12px; color:var(--muted); padding:10px 14px 0; flex-shrink:0;">可以直接用自然語言問董事長聯絡事項/拜訪紀錄的相關問題，AI會依查詢到的紀錄回答</div>
+      <div id="aiqa-conversation" style="flex:1; min-height:0; overflow-y:auto; padding:10px 14px;"></div>
+      <div style="display:flex; gap:8px; padding:10px 14px; border-top:1px solid var(--border); flex-shrink:0; background:#fff;">
+        <input id="aiqa-question-input" placeholder="輸入你的問題..." onkeydown="if(event.key==='Enter')submitAiQuestion();" style="flex:1;" />
+        <button class="btn btn-primary" id="aiqa-submit-btn" onclick="submitAiQuestion()" style="flex-shrink:0;">送出</button>
+      </div>
+    </div>
+    <div id="ai-qa-resize-handle" class="ai-widget-resize-handle" title="拖曳調整大小">⤡</div>
   </div>
 
   <div class="container">
@@ -873,6 +914,143 @@ async function changePassword() {
     document.getElementById('pwdBox').classList.add('hidden');
     msgEl.innerHTML = '';
   }, 1200);
+}
+
+// ---------- AI問答視窗：可拖曳、可縮放（共用邏輯）----------
+var AI_WIDGET_MIN_WIDTH = 320, AI_WIDGET_MIN_HEIGHT = 360;
+function aiWidgetDefaultGeo() {
+  var vw = window.innerWidth, vh = window.innerHeight;
+  var width = Math.min(400, vw - 32), height = Math.min(560, vh - 100);
+  return { x: vw - width - 20, y: vh - height - 90, width: width, height: height };
+}
+function aiWidgetClampGeo(geo) {
+  var vw = window.innerWidth, vh = window.innerHeight;
+  var width = Math.min(geo.width, vw - 16), height = Math.min(geo.height, vh - 16);
+  return {
+    width: width, height: height,
+    x: Math.min(Math.max(geo.x, 8), Math.max(8, vw - width - 8)),
+    y: Math.min(Math.max(geo.y, 8), Math.max(8, vh - height - 8))
+  };
+}
+function initAiWidget(opts) {
+  var box = document.getElementById(opts.boxId);
+  var header = document.getElementById(opts.headerId);
+  var resizeHandle = document.getElementById(opts.resizeId);
+  if (!box || !header || !resizeHandle) return null;
+  var geo;
+  try { var saved = sessionStorage.getItem(opts.geoKey); geo = saved ? aiWidgetClampGeo(JSON.parse(saved)) : aiWidgetDefaultGeo(); }
+  catch (e) { geo = aiWidgetDefaultGeo(); }
+
+  function applyGeo() { box.style.left = geo.x + 'px'; box.style.top = geo.y + 'px'; box.style.width = geo.width + 'px'; box.style.height = geo.height + 'px'; }
+  function saveGeo() { try { sessionStorage.setItem(opts.geoKey, JSON.stringify(geo)); } catch (e) {} }
+  applyGeo();
+
+  window.addEventListener('resize', function () { geo = aiWidgetClampGeo(geo); applyGeo(); });
+
+  function getPoint(e) { return (e.touches && e.touches[0]) ? e.touches[0] : e; }
+
+  var dragState = null;
+  function onDragMove(e) {
+    if (!dragState) return;
+    var p = getPoint(e);
+    var dx = p.clientX - dragState.startX, dy = p.clientY - dragState.startY;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    geo.x = Math.min(Math.max(dragState.origX + dx, 8), Math.max(8, vw - geo.width - 8));
+    geo.y = Math.min(Math.max(dragState.origY + dy, 8), Math.max(8, vh - geo.height - 8));
+    applyGeo();
+  }
+  function onDragEnd() {
+    dragState = null; box.classList.remove('dragging'); document.body.style.userSelect = '';
+    saveGeo();
+    window.removeEventListener('mousemove', onDragMove); window.removeEventListener('mouseup', onDragEnd);
+    window.removeEventListener('touchmove', onDragMove); window.removeEventListener('touchend', onDragEnd);
+  }
+  function onDragStart(e) {
+    if (e.target.closest('button')) return;
+    var p = getPoint(e);
+    dragState = { startX: p.clientX, startY: p.clientY, origX: geo.x, origY: geo.y };
+    box.classList.add('dragging'); document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onDragMove); window.addEventListener('mouseup', onDragEnd);
+    window.addEventListener('touchmove', onDragMove, { passive: false }); window.addEventListener('touchend', onDragEnd);
+  }
+  header.addEventListener('mousedown', onDragStart);
+  header.addEventListener('touchstart', onDragStart, { passive: true });
+
+  var resizeState = null;
+  function onResizeMove(e) {
+    if (!resizeState) return;
+    if (e.preventDefault) e.preventDefault();
+    var p = getPoint(e);
+    var dx = p.clientX - resizeState.startX, dy = p.clientY - resizeState.startY;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    geo.width = Math.min(Math.max(resizeState.origW + dx, AI_WIDGET_MIN_WIDTH), vw - geo.x - 8);
+    geo.height = Math.min(Math.max(resizeState.origH + dy, AI_WIDGET_MIN_HEIGHT), vh - geo.y - 8);
+    applyGeo();
+  }
+  function onResizeEnd() {
+    resizeState = null; box.classList.remove('resizing'); document.body.style.userSelect = '';
+    saveGeo();
+    window.removeEventListener('mousemove', onResizeMove); window.removeEventListener('mouseup', onResizeEnd);
+    window.removeEventListener('touchmove', onResizeMove); window.removeEventListener('touchend', onResizeEnd);
+  }
+  function onResizeStart(e) {
+    e.stopPropagation(); if (e.preventDefault) e.preventDefault();
+    var p = getPoint(e);
+    resizeState = { startX: p.clientX, startY: p.clientY, origW: geo.width, origH: geo.height };
+    box.classList.add('resizing'); document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onResizeMove); window.addEventListener('mouseup', onResizeEnd);
+    window.addEventListener('touchmove', onResizeMove, { passive: false }); window.addEventListener('touchend', onResizeEnd);
+  }
+  resizeHandle.addEventListener('mousedown', onResizeStart);
+  resizeHandle.addEventListener('touchstart', onResizeStart, { passive: false });
+
+  return {
+    resetPosition: function () { geo = aiWidgetDefaultGeo(); applyGeo(); saveGeo(); }
+  };
+}
+var aiWidgetCtrl = initAiWidget({ boxId: 'ai-qa-modal', headerId: 'ai-qa-drag-header', resizeId: 'ai-qa-resize-handle', geoKey: 'interview_ai_chat_geo' });
+
+// ---------- AI問答：送出問題 ----------
+function openAiQa() { document.getElementById('ai-qa-modal').classList.add('open'); }
+function closeAiQa() { document.getElementById('ai-qa-modal').classList.remove('open'); }
+function appendAiQaBubble(role, text) {
+  var wrap = document.getElementById('aiqa-conversation');
+  var isUser = (role === 'user');
+  var bubble = document.createElement('div');
+  bubble.className = isUser ? 'ai-bubble-user' : 'ai-bubble-ai';
+  var inner = document.createElement('div');
+  inner.textContent = text;
+  bubble.appendChild(inner);
+  wrap.appendChild(bubble);
+  wrap.scrollTop = wrap.scrollHeight;
+  return bubble;
+}
+async function submitAiQuestion() {
+  var input = document.getElementById('aiqa-question-input');
+  var question = input.value.trim();
+  if (!question) return;
+  var btn = document.getElementById('aiqa-submit-btn');
+  input.value = '';
+  appendAiQaBubble('user', question);
+  var loadingBubble = appendAiQaBubble('ai', '思考中...');
+  btn.disabled = true;
+  try {
+    var { data: { session } } = await sb.auth.getSession();
+    var resp = await fetch('/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (session ? session.access_token : '') },
+      body: JSON.stringify({ question: question })
+    });
+    var result = await resp.json().catch(function () { return { error: '伺服器回應格式異常' }; });
+    if (!resp.ok || result.error) {
+      loadingBubble.querySelector('div').textContent = '查詢失敗：' + (result.error || '未知錯誤');
+    } else {
+      loadingBubble.querySelector('div').textContent = result.answer || '（AI沒有回傳內容）';
+    }
+  } catch (err) {
+    loadingBubble.querySelector('div').textContent = '查詢失敗：' + err.message;
+  }
+  btn.disabled = false;
 }
 
 // ---------- 進站時檢查是否已登入 ----------
