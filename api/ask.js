@@ -10,8 +10,8 @@ const AI_BASE_URL = process.env.AI_BASE_URL || 'https://api.deepinfra.com/v1/ope
 const AI_MODEL = process.env.AI_MODEL || 'openai/gpt-oss-120b';
 const AI_API_KEY = process.env.DEEPINFRA_API_KEY_INTERVIEWS;
 
-const SYSTEM_PROMPT = '你是董事長的訪談紀錄查詢助理。根據提供的訪談紀錄，用繁體中文回答使用者的問題。'
-  + '回答時請整理出：這個人總共見過幾次、每次的日期、地點/場合、談話重點。'
+const SYSTEM_PROMPT = '你是董事長的聯絡事項查詢助理。根據提供的訪談/聯絡紀錄，用繁體中文回答使用者的問題。'
+  + '回答時請整理出：這個人（或這家公司）總共出現幾次、每次的日期、公司/單位、內容重點；如果紀錄裡有陪同人員或備註，也請一併列出。'
   + '如果有多筆紀錄，請按日期排序後條列說明，不要遺漏任何一筆。'
   + '如果提供的紀錄中找不到與問題相關的人或內容，請直接說明「查無相關紀錄」，不要編造內容。'
   + '回答要簡潔，用條列式呈現，方便在手機上快速閱讀。'
@@ -36,19 +36,18 @@ export default async function handler(req, res) {
     return;
   }
 
-  // records 是前端從 Supabase 模糊搜尋出來的訪談紀錄陣列
-  // 每筆預期欄位：姓名、公司名稱、職稱、場合類型、地點、日期、談話重點
+  // records 是前端從 Supabase 模糊搜尋出來的 interview_records 紀錄陣列
+  // 實際欄位：record_date、company、person、content、companion、note
   const recordsText = Array.isArray(records) && records.length > 0
     ? records
         .map((r, i) => {
           return `【紀錄 ${i + 1}】\n`
-            + `姓名：${r.name || ''}\n`
-            + `公司：${r.company || ''}\n`
-            + `職稱：${r.title || ''}\n`
-            + `場合：${r.occasion_type || ''}\n`
-            + `地點：${r.location || ''}\n`
-            + `日期：${r.date || ''}\n`
-            + `談話重點：${r.summary || ''}`;
+            + `日期：${r.record_date || ''}\n`
+            + `公司/單位：${r.company || ''}\n`
+            + `人員：${r.person || ''}\n`
+            + `內容：${r.content || ''}\n`
+            + `陪同人員：${r.companion || ''}\n`
+            + `備註：${r.note || ''}`;
         })
         .join('\n\n')
     : '(查無符合的紀錄)';
@@ -57,7 +56,7 @@ export default async function handler(req, res) {
     { role: 'system', content: SYSTEM_PROMPT },
     {
       role: 'user',
-      content: `以下是搜尋到的訪談紀錄：\n\n${recordsText}\n\n使用者問題：\n${question}`
+      content: `以下是搜尋到的聯絡紀錄：\n\n${recordsText}\n\n使用者問題：\n${question}`
     }
   ];
 
