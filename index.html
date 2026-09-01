@@ -1010,7 +1010,7 @@ function initAiWidget(opts) {
 }
 var aiWidgetCtrl = initAiWidget({ boxId: 'ai-qa-modal', headerId: 'ai-qa-drag-header', resizeId: 'ai-qa-resize-handle', geoKey: 'interview_ai_chat_geo' });
 
-// ---------- AI問答：送出問題 ----------
+// ---------- AI問答：查詢資料 + 送出問題 ----------
 function openAiQa() { document.getElementById('ai-qa-modal').classList.add('open'); }
 function closeAiQa() { document.getElementById('ai-qa-modal').classList.remove('open'); }
 function appendAiQaBubble(role, text) {
@@ -1025,6 +1025,48 @@ function appendAiQaBubble(role, text) {
   wrap.scrollTop = wrap.scrollHeight;
   return bubble;
 }
+
+// 先把資料庫裡出現過的人員/公司名稱抓一份快取起來，比對問題裡有沒有提到，
+// 藉此判斷該用哪些關鍵字去查 interview_records（人員欄位可能一格存多人、用換行分隔）
+var aiEntityCache = null;
+async function aiLoadEntityCache() {
+  if (aiEntityCache) return aiEntityCache;
+  var { data, error } = await sb.from('interview_records').select('person,company');
+  var set = new Set();
+  (data || []).forEach(function (r) {
+    String(r.person || '').split('\n').forEach(function (p) { p = p.trim(); if (p) set.add(p); });
+    var c = String(r.company || '').trim();
+    if (c) set.add(c);
+  });
+  aiEntityCache = Array.from(set).filter(function (s) { return s.length >= 2; });
+  return aiEntityCache;
+}
+
+// 依問題內容找出對應的訪談紀錄：優先用問題裡有出現過的人員/公司名稱去查，
+// 完全比對不到才退而求其次，直接拿整句問題去模糊比對所有欄位
+async function aiSearchRecordsForQuestion(question) {
+  var entities = await aiLoadEntityCache();
+  var matched = entities.filter(function (e) { return question.indexOf(e) !== -1; });
+
+  var query = sb.from('interview_records').select('*').order('record_date', { ascending: false }).limit(50);
+  if (matched.length > 0) {
+    var orExpr = matched.map(function (e) {
+      var like = '%' + e + '%';
+      return 'person.ilike.' + like + ',company.ilike.' + like;
+    }).join(',');
+    query = query.or(orExpr);
+  } else {
+    var like = '%' + question.trim() + '%';
+    query = query.or(
+      'company.ilike.' + like + ',person.ilike.' + like + ',content.ilike.' + like
+      + ',companion.ilike.' + like + ',note.ilike.' + like
+    );
+  }
+  var { data, error } = await query;
+  if (error) { console.error('AI問答查詢紀錄失敗:', error); return []; }
+  return data || [];
+}
+
 async function submitAiQuestion() {
   var input = document.getElementById('aiqa-question-input');
   var question = input.value.trim();
@@ -1035,11 +1077,11 @@ async function submitAiQuestion() {
   var loadingBubble = appendAiQaBubble('ai', '思考中...');
   btn.disabled = true;
   try {
-    var { data: { session } } = await sb.auth.getSession();
+    var records = await aiSearchRecordsForQuestion(question);
     var resp = await fetch('/api/ask', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (session ? session.access_token : '') },
-      body: JSON.stringify({ question: question })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: question, records: records })
     });
     var result = await resp.json().catch(function () { return { error: '伺服器回應格式異常' }; });
     if (!resp.ok || result.error) {
