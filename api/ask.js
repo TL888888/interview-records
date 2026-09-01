@@ -11,11 +11,13 @@ const AI_MODEL = process.env.AI_MODEL || 'openai/gpt-oss-120b';
 const AI_API_KEY = process.env.DEEPINFRA_API_KEY_INTERVIEWS;
 
 const SYSTEM_PROMPT = '你是董事長的聯絡事項查詢助理。根據提供的訪談/聯絡紀錄，用繁體中文回答使用者的問題。'
-  + '回答時請整理出：這個人（或這家公司）總共出現幾次、每次的日期、公司/單位、內容重點；如果紀錄裡有陪同人員或備註，也請一併列出。'
-  + '如果有多筆紀錄，請按日期排序後條列說明，不要遺漏任何一筆。'
+  + '請用自然的口語幫忙整理重點，不要逐項照抄「日期：xx／公司：xx／人員：xx」這種資料庫欄位格式，改成像跟人說話一樣的敘述句。'
+  + '例如可以寫成：「王小明總共出現3次，最近一次是2024-05-10在ABC公司談XX事宜，另外2023年也曾在...」這樣的寫法。'
+  + '紀錄裡如果某個欄位是空的或沒有資料，就直接略過、不要提到它，不要為了格式完整而寫「無」。'
+  + '如果有多筆紀錄，先說總共出現幾次，再依日期新到舊，簡短敘述每次的重點，不要遺漏任何一筆。'
   + '如果提供的紀錄中找不到與問題相關的人或內容，請直接說明「查無相關紀錄」，不要編造內容。'
-  + '回答要簡潔，用條列式呈現，方便在手機上快速閱讀。'
-  + '絕對不要輸出markdown表格語法（不要用|和---組成的表格），一律用條列文字說明。'
+  + '回答要簡潔，方便在手機上快速閱讀。'
+  + '絕對不要使用任何markdown語法，包括表格（|和---組成的表格）、星號粗體（**文字**）、井字號標題（#）、項目符號(-或*開頭)，全部都只能用純文字與正常標點，需要分項時用「一、二、三」或換行加編號的方式呈現。'
   + '稱呼使用者一律用「您」，整段回答從頭到尾保持一致。';
 
 export default async function handler(req, res) {
@@ -38,16 +40,18 @@ export default async function handler(req, res) {
 
   // records 是前端從 Supabase 模糊搜尋出來的 interview_records 紀錄陣列
   // 實際欄位：record_date、company、person、content、companion、note
+  // 這裡先把空欄位濾掉，只把有內容的資訊交給AI，減少AI逐欄位照抄「無」的機會
   const recordsText = Array.isArray(records) && records.length > 0
     ? records
         .map((r, i) => {
-          return `【紀錄 ${i + 1}】\n`
-            + `日期：${r.record_date || ''}\n`
-            + `公司/單位：${r.company || ''}\n`
-            + `人員：${r.person || ''}\n`
-            + `內容：${r.content || ''}\n`
-            + `陪同人員：${r.companion || ''}\n`
-            + `備註：${r.note || ''}`;
+          const parts = [];
+          if (r.record_date) parts.push(`日期：${r.record_date}`);
+          if (r.company) parts.push(`公司/單位：${r.company}`);
+          if (r.person) parts.push(`人員：${r.person}`);
+          if (r.content) parts.push(`內容：${r.content}`);
+          if (r.companion) parts.push(`陪同人員：${r.companion}`);
+          if (r.note) parts.push(`備註：${r.note}`);
+          return `【紀錄 ${i + 1}】\n` + parts.join('\n');
         })
         .join('\n\n')
     : '(查無符合的紀錄)';
