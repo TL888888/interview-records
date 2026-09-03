@@ -1123,7 +1123,7 @@ async function submitAiQuestion() {
     var resp = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: question, records: records })
+      body: JSON.stringify({ question: question, records: records, asker_email: currentUser ? currentUser.email : null })
     });
     var result = await resp.json().catch(function () { return { error: '伺服器回應格式異常' }; });
     var finalText;
