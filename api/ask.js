@@ -10,6 +10,38 @@ const AI_BASE_URL = process.env.AI_BASE_URL || 'https://api.deepinfra.com/v1/ope
 const AI_MODEL = process.env.AI_MODEL || 'openai/gpt-oss-120b';
 const AI_API_KEY = process.env.DEEPINFRA_API_KEY_INTERVIEWS;
 
+// ---- AI用量統計：推播設定 ----
+// SYSTEM_NAME/API_KEY_NAME 用來標示這是「哪個系統、用哪把Key」，寫進中央統計表
+// STATS_PUSH_URL/STATS_PUSH_SECRET 要跟 Supabase Edge Function 那邊設定的值一致
+const SYSTEM_NAME = 'interview';
+const API_KEY_NAME = 'DEEPINFRA_API_KEY_INTERVIEWS';
+const STATS_PUSH_URL = process.env.STATS_PUSH_URL || 'https://bvuygyajzupeqpqfwmgi.supabase.co/functions/v1/stats-ai-usage-push';
+const STATS_PUSH_SECRET = process.env.STATS_PUSH_SECRET;
+// Supabase Edge Function 平台本身要求每個請求都要帶 Authorization 標頭才會放行，
+// 這把是 TL_projects 專案公開的 anon key（不是機密，RLS會保護資料，這裡只是用來過Supabase大門）
+const STATS_PUSH_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2dXlneWFqenVwZXFwcWZ3bWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNjA5MjQsImV4cCI6MjA5NzczNjkyNH0.zvP-JWgHRWiCKZbqSSU6-uGgx3WHwG0nFxfG8xDhEH8';
+
+// 推播用量到中央統計表，失敗也不影響使用者拿到AI答案（fire-and-forget，故意不 await）
+// 費用統一由中央 Edge Function 依當下單價換算，這裡只負責把真實token數字送過去
+function pushUsageStats({ promptTokens, completionTokens, cacheHit, askerEmail }) {
+  if (!STATS_PUSH_SECRET) return; // 尚未設定推播密鑰時直接跳過，不報錯
+  fetch(STATS_PUSH_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${STATS_PUSH_ANON_KEY}`, 'x-push-secret': STATS_PUSH_SECRET },
+    body: JSON.stringify({
+      system_name: SYSTEM_NAME,
+      api_key_name: API_KEY_NAME,
+      ai_provider: 'deepinfra',
+      ai_model: AI_MODEL,
+      asker_email: askerEmail || null,
+      prompt_tokens: promptTokens || 0,
+      completion_tokens: completionTokens || 0,
+      total_tokens: (promptTokens || 0) + (completionTokens || 0),
+      cache_hit: !!cacheHit
+    })
+  }).catch((e) => console.error('推播AI用量統計失敗（不影響本次回答）:', e));
+}
+
 const SYSTEM_PROMPT = '你是董事長的聯絡事項查詢助理。根據提供的訪談/聯絡紀錄，用繁體中文回答使用者的問題。'
   + '請用自然的口語幫忙整理重點，不要逐項照抄「日期：xx／公司：xx／人員：xx」這種資料庫欄位格式，改成像跟人說話一樣的敘述句。'
   + '例如可以寫成：「王小明總共出現3次，最近一次是2024-05-10在ABC公司談XX事宜，另外2023年也曾在...」這樣的寫法。'
@@ -26,7 +58,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { question, records } = req.body || {};
+  const { question, records, asker_email } = req.body || {};
 
   if (!question || typeof question !== 'string') {
     res.status(400).json({ error: '缺少 question' });
@@ -87,6 +119,13 @@ export default async function handler(req, res) {
 
     const data = await aiRes.json();
     const answer = data?.choices?.[0]?.message?.content || '抱歉，無法產生回答。';
+    const usage = data?.usage || {};
+    pushUsageStats({
+      promptTokens: usage.prompt_tokens,
+      completionTokens: usage.completion_tokens,
+      cacheHit: false,
+      askerEmail: asker_email
+    });
     res.status(200).json({ answer });
   } catch (err) {
     console.error('呼叫 AI 服務發生例外:', err);
