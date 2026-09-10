@@ -352,6 +352,14 @@
     <!-- 輸入畫面 -->
     <div id="inputTab" class="card hidden">
       <h3 style="margin-top:0">手動新增一筆</h3>
+
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+        <input id="ocrFileInput" type="file" accept="image/*" capture="environment" style="display:none" onchange="handleOcrFile(event)" />
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('ocrFileInput').click()">📷 拍照辨識名片/筆記</button>
+        <span style="font-size:12px; color:var(--muted);">拍名片或手寫筆記，AI 會自動判讀並帶入下方欄位，確認/修改後再按「新增這筆」存檔</span>
+      </div>
+      <div id="ocrMsg"></div>
+
       <div class="grid">
         <div><label>日期</label><input id="newDate" type="date" /></div>
         <div><label>公司/單位</label><input id="newCompany" /></div>
@@ -621,6 +629,52 @@ function normalizePersonList(raw) {
 }
 
 // ---------- 輸入畫面：手動新增 ----------
+// ---------- 拍照辨識名片/手寫筆記，結果帶入「手動新增」表單讓使用者確認 ----------
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result); // data:image/xxx;base64,....
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleOcrFile(event) {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = ''; // 清空，讓同一張照片下次也能重新選取觸發 onchange
+  if (!file) return;
+
+  const msgEl = document.getElementById('ocrMsg');
+  msgEl.innerHTML = `<div class="msg">🔍 辨識中，請稍候...（名片/手寫字較多時可能要幾秒鐘）</div>`;
+
+  try {
+    const dataUrl = await fileToBase64(file);
+    const resp = await fetch('/api/ocr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUrl, mime_type: file.type, asker_email: currentUser ? currentUser.email : null })
+    });
+    const result = await resp.json().catch(() => ({ error: '伺服器回應格式異常' }));
+
+    if (!resp.ok || result.error) {
+      msgEl.innerHTML = `<div class="msg err">辨識失敗：${result.error || '未知錯誤'}，請重新拍照或直接手動輸入</div>`;
+      return;
+    }
+
+    // 把辨識結果帶入手動新增表單，不自動存檔，讓使用者看過/修改後再自己按「新增這筆」
+    if (result.record_date) document.getElementById('newDate').value = result.record_date;
+    document.getElementById('newCompany').value = result.company || '';
+    document.getElementById('newPerson').value = result.person || '';
+    document.getElementById('newCompanion').value = result.companion || '';
+    document.getElementById('newContent').value = result.content || '';
+    document.getElementById('newNote').value = result.note || '';
+
+    msgEl.innerHTML = `<div class="msg ok">✅ 辨識完成，已帶入下方欄位，請確認/修改內容後再按「新增這筆」存檔</div>`;
+  } catch (err) {
+    msgEl.innerHTML = `<div class="msg err">辨識失敗：${err.message}，請重新拍照或直接手動輸入</div>`;
+  }
+}
+
 async function addRecord() {
   const record = {
     record_date: document.getElementById('newDate').value || null,
