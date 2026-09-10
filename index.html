@@ -142,6 +142,13 @@
   .search-btn-row { align-items: center; }
   .input-row2 { display: flex; gap: 14px; margin-top: 14px; flex-wrap: wrap; }
   .input-row2 > div { min-width: 150px; }
+  .ocr-highlight-box {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--blue); padding: 14px 16px; border-radius: 10px; margin-bottom: 16px;
+  }
+  .ocr-highlight-btn { background: #fff; color: var(--blue); font-weight: 700; }
+  .ocr-highlight-btn:hover { background: #f0f4ff; }
+  .ocr-highlight-desc { font-size: 12px; color: #e6ecff; }
   @media (max-width: 640px) {
     header { position: relative; }
     header .user-info button#logoutBtn { position: absolute; top: 10px; right: 14px; }
@@ -300,8 +307,8 @@
   <div class="container">
     <div class="toolbar-row">
       <div class="tabs">
-        <button id="tabBtnQuery" class="active" onclick="switchTab('query')">查詢</button>
         <button id="tabBtnInput" onclick="switchTab('input')">輸入</button>
+        <button id="tabBtnQuery" class="active" onclick="switchTab('query')">查詢</button>
         <button id="tabBtnAdmin" class="hidden" onclick="switchTab('admin')">帳號管理</button>
       </div>
       <div id="excelActions" class="excel-actions hidden">
@@ -351,12 +358,11 @@
 
     <!-- 輸入畫面 -->
     <div id="inputTab" class="card hidden">
-      <h3 style="margin-top:0">手動新增一筆</h3>
 
-      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+      <div class="ocr-highlight-box">
         <input id="ocrFileInput" type="file" accept="image/*" capture="environment" style="display:none" onchange="handleOcrFile(event)" />
-        <button type="button" class="btn btn-outline" onclick="document.getElementById('ocrFileInput').click()">📷 拍照辨識名片/筆記</button>
-        <span style="font-size:12px; color:var(--muted);">拍名片或手寫筆記，AI 會自動判讀並帶入下方欄位，確認/修改後再按「新增這筆」存檔</span>
+        <button type="button" class="btn ocr-highlight-btn" onclick="document.getElementById('ocrFileInput').click()">📷 拍照辨識名片/筆記</button>
+        <span class="ocr-highlight-desc">拍名片或手寫筆記，AI 會自動判讀並帶入下方欄位，確認/修改後再按「新增這筆」存檔</span>
       </div>
       <div id="ocrMsg"></div>
 
@@ -630,10 +636,29 @@ function normalizePersonList(raw) {
 
 // ---------- 輸入畫面：手動新增 ----------
 // ---------- 拍照辨識名片/手寫筆記，結果帶入「手動新增」表單讓使用者確認 ----------
-function fileToBase64(file) {
+// 手機拍照的原始檔案常有2~5MB，轉成base64後容易超過伺服器能接受的資料大小上限，
+// 導致伺服器直接回傳錯誤頁面(不是JSON)而顯示「伺服器回應格式異常」。
+// 這裡改成先用畫布把圖片縮小/壓縮成JPEG再上傳，大幅降低這個問題發生的機率。
+function fileToResizedBase64(file, maxDim, quality) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result); // data:image/xxx;base64,....
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width, height = img.height;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) { height = Math.round(height * maxDim / width); width = maxDim; }
+          else { width = Math.round(width * maxDim / height); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('圖片讀取失敗'));
+      img.src = reader.result;
+    };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
@@ -648,13 +673,13 @@ async function handleOcrFile(event) {
   msgEl.innerHTML = `<div class="msg">🔍 辨識中，請稍候...（名片/手寫字較多時可能要幾秒鐘）</div>`;
 
   try {
-    const dataUrl = await fileToBase64(file);
+    const dataUrl = await fileToResizedBase64(file, 1600, 0.82); // 壓縮後一律是 image/jpeg
     const resp = await fetch('/api/ocr', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: dataUrl, mime_type: file.type, asker_email: currentUser ? currentUser.email : null })
+      body: JSON.stringify({ image: dataUrl, mime_type: 'image/jpeg', asker_email: currentUser ? currentUser.email : null })
     });
-    const result = await resp.json().catch(() => ({ error: '伺服器回應格式異常' }));
+    const result = await resp.json().catch(() => ({ error: '伺服器回應格式異常，可能是圖片仍然過大，請再拍近一點或裁切後再試' }));
 
     if (!resp.ok || result.error) {
       msgEl.innerHTML = `<div class="msg err">辨識失敗：${result.error || '未知錯誤'}，請重新拍照或直接手動輸入</div>`;
