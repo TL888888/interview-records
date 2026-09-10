@@ -366,14 +366,14 @@
       </div>
       <div id="ocrMsg"></div>
 
-      <div class="grid">
+      <div class="grid" style="grid-template-columns: 1fr 1fr;">
         <div><label>日期</label><input id="newDate" type="date" /></div>
-        <div><label>公司/單位</label><input id="newCompany" /></div>
-        <div><label>人員</label><input id="newPerson" /></div>
-        <div><label>陪同人員</label><input id="newCompanion" /></div>
+        <div><label>姓名</label><input id="newPerson" /></div>
       </div>
+      <div style="margin-top:14px"><label>公司/單位</label><input id="newCompany" /></div>
+      <div style="margin-top:14px"><label>內容</label><textarea id="newContent" style="min-height:180px;"></textarea></div>
       <div class="input-row2">
-        <div style="flex:3"><label>內容</label><textarea id="newContent"></textarea></div>
+        <div style="flex:1"><label>陪同</label><textarea id="newCompanion"></textarea></div>
         <div style="flex:1"><label>備註</label><textarea id="newNote"></textarea></div>
       </div>
       <div class="btn-row">
