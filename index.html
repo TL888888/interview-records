@@ -149,6 +149,7 @@
   .ocr-highlight-btn { background: #fff; color: var(--blue); font-weight: 700; }
   .ocr-highlight-btn:hover { background: #f0f4ff; }
   .ocr-highlight-desc { font-size: 12px; color: #e6ecff; }
+  .action-btn { padding: 6px 10px; font-size: 12px; white-space: nowrap; }
   @media (max-width: 640px) {
     header { position: relative; }
     header .user-info button#logoutBtn { position: absolute; top: 10px; right: 14px; }
@@ -166,6 +167,8 @@
     td.col-content { max-width: 480px; }  /* 約30個中文字寬度就換行，把省下的寬度留給內容 */
     td.col-companion { max-width: 60px; } /* 約3個中文字寬度就換行 */
     td.col-note { max-width: 100px; }     /* 約6個中文字寬度就換行 */
+    .action-btn .btn-text { display: none; }
+    .action-btn { padding: 6px 8px; }
   }
 </style>
 </head>
@@ -348,7 +351,7 @@
       <div class="table-wrap">
       <table>
         <thead>
-          <tr><th style="width:90px">日期</th><th style="min-width:80px">公司/單位</th><th style="min-width:80px">人員</th><th>內容</th><th style="min-width:80px">陪同人員</th><th>備註</th></tr>
+          <tr><th style="width:90px">日期</th><th style="min-width:80px">公司/單位</th><th style="min-width:80px">人員</th><th>內容</th><th style="min-width:80px">陪同人員</th><th>備註</th><th style="width:90px">操作</th></tr>
         </thead>
         <tbody id="resultsBody"></tbody>
       </table>
@@ -606,6 +609,12 @@ function renderResultsPage() {
       <td class="col-content">${escapeHtml(r.content)}</td>
       <td class="pre-nowrap col-companion">${escapeHtml(r.companion)}</td>
       <td class="col-note">${escapeHtml(r.note)}</td>
+      <td>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-outline action-btn" onclick="openEditRecord('${r.id}')">✏️<span class="btn-text"> 編輯</span></button>
+          <button class="btn btn-danger action-btn" onclick="deleteRecord('${r.id}')">🗑️<span class="btn-text"> 刪除</span></button>
+        </div>
+      </td>
     </tr>
   `).join('');
 
@@ -639,6 +648,15 @@ function normalizePersonList(raw) {
 // 手機拍照的原始檔案常有2~5MB，轉成base64後容易超過伺服器能接受的資料大小上限，
 // 導致伺服器直接回傳錯誤頁面(不是JSON)而顯示「伺服器回應格式異常」。
 // 這裡改成先用畫布把圖片縮小/壓縮成JPEG再上傳，大幅降低這個問題發生的機率。
+// 取得「今天」的本地日期字串(YYYY-MM-DD)。不用toISOString()，避免UTC+8時區換算造成日期少一天
+function getTodayLocalDateStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function fileToResizedBase64(file, maxDim, quality) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -687,7 +705,8 @@ async function handleOcrFile(event) {
     }
 
     // 把辨識結果帶入手動新增表單，不自動存檔，讓使用者看過/修改後再自己按「新增這筆」
-    if (result.record_date) document.getElementById('newDate').value = result.record_date;
+    // 辨識不到日期時，預設帶入「今天」(輸入當下)的日期，而不是留空，反正辨識有誤或用不到都還能手動改
+    document.getElementById('newDate').value = result.record_date || getTodayLocalDateStr();
     document.getElementById('newCompany').value = result.company || '';
     document.getElementById('newPerson').value = result.person || '';
     document.getElementById('newCompanion').value = result.companion || '';
@@ -746,8 +765,8 @@ function renderAllPage() {
       <td class="col-note">${escapeHtml(r.note)}</td>
       <td>
         <div style="display:flex; gap:6px;">
-          <button class="btn btn-outline" style="padding:6px 10px; font-size:12px;" onclick="openEditRecord('${r.id}')">編輯</button>
-          <button class="btn btn-danger" style="padding:6px 10px; font-size:12px;" onclick="deleteRecord('${r.id}')">刪除</button>
+          <button class="btn btn-outline action-btn" onclick="openEditRecord('${r.id}')">✏️<span class="btn-text"> 編輯</span></button>
+          <button class="btn btn-danger action-btn" onclick="deleteRecord('${r.id}')">🗑️<span class="btn-text"> 刪除</span></button>
         </div>
       </td>
     </tr>
@@ -768,7 +787,7 @@ async function deleteRecord(id) {
 let editingRecordId = null;
 
 function openEditRecord(id) {
-  const r = allRecordsData.find(x => x.id === id);
+  const r = lastSearchResults.find(x => x.id === id) || allRecordsData.find(x => x.id === id);
   if (!r) { alert('找不到這筆資料，畫面可能過期，請重新整理再試'); return; }
   editingRecordId = id;
   document.getElementById('editDate').value = r.record_date || '';
