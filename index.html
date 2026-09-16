@@ -3,18 +3,21 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>董事長聯絡事項查詢系統</title>
+<title>董事長訪談資料庫</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.2/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
-    --navy: #0f1b33;
+    --navy: #0f172a;
+    --teal: #14b8a6;
     --blue: #2563eb;
     --blue-dark: #1d4ed8;
-    --border: #e5e7eb;
+    --border: #e2e8f0;
     --bg: #f8fafc;
     --text: #1f2937;
-    --muted: #6b7280;
+    --muted: #64748b;
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.08);
   }
   * { box-sizing: border-box; }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -44,56 +47,74 @@
     position: sticky;
     top: 0;
     z-index: 40;
+    border-bottom: 4px solid var(--teal);
+    box-shadow: var(--shadow-md);
   }
-  header .title { font-size: 18px; font-weight: 600; white-space: nowrap; }
-  header .title span { color: #9fb4ff; font-weight: normal; font-size: 13px; margin-left: 8px; }
+  header .title { font-size: 18px; font-weight: 700; white-space: nowrap; }
+  header .title::before { content: "📇"; margin-right: 8px; }
+  header .title span { color: #5eead4; font-weight: normal; font-size: 13px; margin-left: 8px; }
   header .user-info { display: flex; align-items: center; gap: 16px; font-size: 14px; flex-wrap: wrap; }
   header .user-info button {
-    background: #b91c1c; color: #fff; border: none; padding: 6px 14px;
-    border-radius: 6px; cursor: pointer; font-size: 13px;
+    background: #b91c1c; color: #fff; border: none; padding: 7px 16px;
+    border-radius: 999px; cursor: pointer; font-size: 13px; font-weight: 700;
+    box-shadow: var(--shadow-sm); transition: background 0.15s;
   }
+  header .user-info button:hover { background: #991b1b; }
   .container { max-width: 1200px; margin: 20px auto; padding: 0 16px; }
   .card {
-    background: #fff; border-radius: 10px; border: 1px solid var(--border);
-    padding: 20px; margin-bottom: 16px;
+    background: #fff; border-radius: 12px; border: 1px solid var(--border);
+    padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow-sm);
   }
   .toolbar-row {
     display: flex; justify-content: space-between; align-items: center;
     flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
   }
-  .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tabs { display: flex; gap: 3px; flex-wrap: wrap; background: #f1f5f9; padding: 4px; border-radius: 10px; box-shadow: inset 0 1px 2px rgba(15,23,42,0.06); }
   .tabs button {
-    padding: 9px 18px; border-radius: 8px; border: 1px solid var(--border);
-    background: #fff; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--muted);
+    padding: 8px 16px; border-radius: 8px; border: none;
+    background: transparent; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--muted);
+    transition: background 0.15s, color 0.15s;
   }
-  .tabs button.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .tabs button:hover { color: var(--text); }
+  .tabs button.active { background: #fff; color: var(--blue); box-shadow: var(--shadow-sm); }
   .excel-actions {
     display: flex; align-items: center; gap: 8px; font-size: 13px;
-    background: #fff; border: 1px solid var(--border); padding: 8px 10px; border-radius: 8px;
+    background: #fff; border: 1px solid var(--border); padding: 8px 12px; border-radius: 10px;
+    box-shadow: var(--shadow-sm);
   }
   .excel-actions input[type=file] { font-size: 13px; max-width: 190px; color: var(--muted); }
-  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; font-weight: 500; }
   input, textarea, select {
-    width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 6px;
-    font-size: 14px; font-family: inherit;
+    width: 100%; padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 8px;
+    font-size: 14px; font-family: inherit; background: #f8fafc; color: var(--text);
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  }
+  input:focus, textarea:focus, select:focus {
+    outline: none; border-color: var(--blue); background: #fff;
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
   }
   textarea { resize: vertical; min-height: 60px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
   .btn {
-    padding: 9px 18px; border-radius: 6px; border: none; cursor: pointer;
+    padding: 9px 18px; border-radius: 8px; border: none; cursor: pointer;
     font-size: 14px; font-weight: 600; white-space: nowrap;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
   }
-  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary { background: var(--blue); color: #fff; box-shadow: var(--shadow-sm); }
   .btn-primary:hover { background: var(--blue-dark); }
-  .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline { background: #fff; border: 1px solid #cbd5e1; color: var(--muted); }
+  .btn-outline:hover { background: #f8fafc; color: var(--blue); border-color: var(--blue); }
   .btn-danger { background: #fee2e2; color: #b91c1c; border: none; }
+  .btn-danger:hover { background: #fecaca; }
   .btn-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
   .table-wrap { overflow-x: auto; overflow-y: auto; max-height: 80vh; -webkit-overflow-scrolling: touch; cursor: grab; }
   .table-wrap.dragging { cursor: grabbing; user-select: none; }
   table { border-collapse: collapse; margin-top: 14px; font-size: 15px; width: max-content; min-width: 100%; }
   th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); vertical-align: top; font-size: 15px; line-height: 1.6; }
   th:last-child, td:last-child { border-right: none; }
-  th { color: #334155; font-weight: 700; background: #e2e8f0; white-space: nowrap; font-size: 13px; text-align: center; position: sticky; top: 0; z-index: 5; box-shadow: 0 2px 0 #94a3b8; }
+  th { color: #334155; font-weight: 700; background: #e2e8f0; white-space: nowrap; font-size: 13px; text-align: center; position: sticky; top: 0; z-index: 5; box-shadow: 0 1px 0 #cbd5e1, 0 2px 4px rgba(15,23,42,0.05); }
+  thead tr:first-child th:first-child { border-top-left-radius: 8px; }
+  thead tr:first-child th:last-child { border-top-right-radius: 8px; }
   td.pre-nowrap { white-space: pre; }        /* 保留原本的換行(如多人分行)，但不因欄位窄而逐字折行 */
   td.col-date { width: 90px; min-width: 90px; white-space: nowrap; }
   td.col-company { min-width: 80px; max-width: 150px; white-space: pre-wrap; word-break: break-word; }  /* 約10個中文字寬度就換行 */
@@ -104,38 +125,46 @@
   .search-big {
     font-size: 16px; padding: 14px 16px;
   }
-  .result-count { font-size: 13px; color: var(--muted); margin: 0; white-space: nowrap; }
-  .result-count b { color: var(--text); font-size: 15px; }
+  .result-count {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted);
+    white-space: nowrap; background: #fff; border: 1px solid var(--border);
+    padding: 5px 12px; border-radius: 999px; box-shadow: var(--shadow-sm);
+  }
+  .result-count b { color: var(--text); font-size: 14px; }
   .hidden { display: none !important; }
   .msg { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-top: 10px; }
   .msg.ok { background: #dcfce7; color: #166534; }
   .msg.err { background: #fee2e2; color: #b91c1c; }
   .login-box {
     max-width: 360px; margin: 100px auto; background: #fff; padding: 30px;
-    border-radius: 10px; border: 1px solid var(--border);
+    border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow-md);
   }
   .login-box h2 { margin-top: 0; font-size: 18px; }
   .role-badge {
-    display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px;
-    background: #e0e7ff; color: #3730a3; margin-left: 6px;
+    display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px;
+    background: #ccfbf1; color: #0f766e; margin-left: 6px; font-weight: 600;
   }
   h3 { font-size: 15px; font-weight: 600; }
   /* ══ AI問答：可拖曳、可縮放的浮動視窗 ══ */
   .ai-widget-box { position: fixed; background: #fff; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 20px 50px rgba(15,27,51,0.28); display: flex; flex-direction: column; z-index: 300; opacity: 0; transform: scale(0.92); pointer-events: none; transition: opacity 0.22s ease, transform 0.22s ease; overflow: hidden; }
   .ai-widget-box.open { opacity: 1; transform: scale(1); pointer-events: auto; }
   .ai-widget-box.dragging, .ai-widget-box.resizing { transition: none; }
-  .ai-widget-header { background: var(--navy); color: #fff; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; cursor: move; user-select: none; flex-shrink: 0; }
+  .ai-widget-header { background: #0f766e; color: #fff; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; cursor: move; user-select: none; flex-shrink: 0; }
   .ai-widget-icon-btn { background: none; border: none; color: rgba(255,255,255,0.85); cursor: pointer; padding: 5px; font-size: 13px; border-radius: 5px; }
   .ai-widget-icon-btn:hover { color: #fff; background: rgba(255,255,255,0.15); }
   .ai-widget-body { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--bg); }
   .ai-widget-resize-handle { position: absolute; right: 2px; bottom: 2px; width: 18px; height: 18px; cursor: nwse-resize; color: #cbd5e1; display: flex; align-items: flex-end; justify-content: flex-end; padding: 2px; }
-  .ai-widget-resize-handle:hover { color: var(--blue); }
+  .ai-widget-resize-handle:hover { color: var(--teal); }
   .ai-bubble-user { display: flex; justify-content: flex-end; margin-bottom: 10px; }
   .ai-bubble-ai { display: flex; justify-content: flex-start; margin-bottom: 10px; }
-  .ai-bubble-user > div { max-width: 85%; padding: 9px 13px; border-radius: 10px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; background: var(--blue); color: #fff; }
+  .ai-bubble-user > div { max-width: 85%; padding: 9px 13px; border-radius: 10px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; background: var(--teal); color: #fff; }
   .ai-bubble-ai > div { max-width: 85%; padding: 9px 13px; border-radius: 10px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; background: #fff; border: 1px solid var(--border); color: var(--text); }
-  .ai-nav-btn { background: none; border: none; color: #9fb4ff; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px; padding: 4px 2px; }
-  .ai-nav-btn:hover { color: #fff; }
+  .ai-nav-btn {
+    background: var(--teal); border: none; color: #fff; cursor: pointer; font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 999px;
+    box-shadow: var(--shadow-sm); transition: background 0.15s;
+  }
+  .ai-nav-btn:hover { background: #0d9488; }
   .search-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
   .search-row-keyword { flex: 2; min-width: 220px; }
   .search-row-item { flex: 1; min-width: 150px; }
@@ -146,10 +175,11 @@
   .input-row2 > div { min-width: 150px; }
   .ocr-highlight-box {
     display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    background: var(--blue); padding: 14px 16px; border-radius: 10px; margin-bottom: 16px;
+    background: var(--blue); padding: 14px 16px; border-radius: 12px; margin-bottom: 16px;
+    box-shadow: var(--shadow-md);
   }
-  .ocr-highlight-btn { background: #fff; color: var(--blue); font-weight: 700; }
-  .ocr-highlight-btn:hover { background: #f0f4ff; }
+  .ocr-highlight-btn { background: #fff; color: var(--blue); font-weight: 700; border-radius: 999px; }
+  .ocr-highlight-btn:hover { background: #f0f4ff; color: var(--blue-dark); border-color: transparent; }
   .ocr-highlight-desc { font-size: 12px; color: #e6ecff; }
   .action-btn { padding: 6px 10px; font-size: 12px; white-space: nowrap; }
   @media (max-width: 640px) {
@@ -177,7 +207,7 @@
 <body>
 
 <div id="loginView" class="login-box">
-  <h2>董事長聯絡事項查詢系統</h2>
+  <h2>董事長訪談資料庫</h2>
   <label>Email</label>
   <input id="loginEmail" type="email" placeholder="you@tlhome.com.tw" />
   <div style="height:10px"></div>
@@ -242,7 +272,7 @@
 
 <div id="appView" class="hidden">
   <header>
-    <div class="title">董事長聯絡事項查詢系統 <span>Contact Records</span></div>
+    <div class="title">董事長訪談資料庫</div>
     <div class="user-info">
       <button class="ai-nav-btn" onclick="openAiQa()">🤖 問問AI</button>
       <span id="userEmailLabel"></span>
@@ -250,6 +280,17 @@
       <button onclick="doLogout()" id="logoutBtn">登出</button>
     </div>
   </header>
+
+  <div id="cardBackConfirmBox" class="hidden" style="position:fixed; inset:0; background:rgba(15,27,51,0.4); z-index:50; display:flex; align-items:center; justify-content:center;">
+    <div class="card" style="max-width:340px; width:90%; padding:24px; box-shadow:0 10px 30px rgba(0,0,0,0.2); text-align:center;">
+      <h3 style="margin-top:0">正面辨識完成</h3>
+      <p style="color:var(--muted); font-size:14px; margin:0 0 4px;">這張名片有反面要拍嗎？</p>
+      <div class="btn-row" style="justify-content:center; margin-top:16px;">
+        <button class="btn btn-outline" onclick="cardBackConfirm(false)">沒有，直接儲存</button>
+        <button class="btn btn-primary" onclick="cardBackConfirm(true)">有，拍反面</button>
+      </div>
+    </div>
+  </div>
 
   <div id="pwdBox" class="hidden" style="position:fixed; inset:0; background:rgba(15,27,51,0.4); z-index:50; display:flex; align-items:flex-start; justify-content:center; padding-top:80px;">
     <div class="card" style="max-width:360px; width:90%; padding:20px 22px; box-shadow:0 10px 30px rgba(0,0,0,0.2);">
@@ -284,6 +325,29 @@
     </div>
   </div>
 
+  <div id="cardEditBox" class="hidden" style="position:fixed; inset:0; background:rgba(15,27,51,0.4); z-index:50; display:flex; align-items:flex-start; justify-content:center; padding-top:60px; overflow-y:auto;">
+    <div class="card" style="max-width:480px; width:90%; padding:20px 22px; box-shadow:0 10px 30px rgba(0,0,0,0.2); margin-bottom:40px;">
+      <h3 style="margin-top:0">編輯這張名片</h3>
+      <div class="grid">
+        <div><label>日期</label><input id="cardEditDate" type="date" /></div>
+        <div><label>公司/單位</label><input id="cardEditCompany" /></div>
+        <div><label>聯絡人</label><input id="cardEditContact" /></div>
+      </div>
+      <div class="grid" style="margin-top:14px">
+        <div><label>電話</label><input id="cardEditPhone" /></div>
+        <div><label>手機</label><input id="cardEditMobile" /></div>
+        <div><label>Email</label><input id="cardEditEmail" /></div>
+      </div>
+      <div style="margin-top:14px"><label>地址</label><input id="cardEditAddress" /></div>
+      <div style="margin-top:14px"><label>備註</label><textarea id="cardEditNote"></textarea></div>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-primary" onclick="saveEditCard()">儲存</button>
+        <button class="btn btn-outline" onclick="closeEditCard()">取消</button>
+      </div>
+      <div id="cardEditMsg"></div>
+    </div>
+  </div>
+
   <!-- ══ AI問答：可拖曳、可縮放浮動視窗 ══ -->
   <div id="ai-qa-modal" class="ai-widget-box">
     <div id="ai-qa-drag-header" class="ai-widget-header">
@@ -314,6 +378,7 @@
       <div class="tabs">
         <button id="tabBtnInput" onclick="switchTab('input')">輸入</button>
         <button id="tabBtnQuery" class="active" onclick="switchTab('query')">查詢</button>
+        <button id="tabBtnCards" onclick="switchTab('cards')">名片管理</button>
         <button id="tabBtnAdmin" class="hidden" onclick="switchTab('admin')">帳號管理</button>
       </div>
       <div id="excelActions" class="excel-actions hidden">
@@ -404,6 +469,58 @@
       <div id="allPager" class="btn-row" style="align-items:center; justify-content:flex-end;"></div>
     </div>
 
+    <!-- 名片管理畫面 -->
+    <div id="cardsTab" class="card hidden">
+      <div class="ocr-highlight-box">
+        <input id="cardOcrFrontInput" type="file" accept="image/*" capture="environment" style="display:none" onchange="handleCardOcrFile(event, 'front')" />
+        <input id="cardOcrBackInput" type="file" accept="image/*" capture="environment" style="display:none" onchange="handleCardOcrFile(event, 'back')" />
+        <button type="button" class="btn ocr-highlight-btn" onclick="document.getElementById('cardOcrFrontInput').click()">📷 拍照辨識名片</button>
+        <span class="ocr-highlight-desc">先拍名片正面，AI 判讀完會問要不要接著拍反面；帶入下方欄位後請確認/修改，再按「新增這筆」存檔</span>
+      </div>
+      <div id="cardOcrMsg"></div>
+
+      <div class="grid" style="grid-template-columns: 1fr 1fr 1fr;">
+        <div><label>日期</label><input id="cardDate" type="date" /></div>
+        <div><label>公司/單位</label><input id="cardCompany" /></div>
+        <div><label>聯絡人</label><input id="cardContact" /></div>
+      </div>
+      <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; margin-top:14px;">
+        <div><label>電話</label><input id="cardPhone" /></div>
+        <div><label>手機</label><input id="cardMobile" /></div>
+        <div><label>Email</label><input id="cardEmail" /></div>
+      </div>
+      <div style="margin-top:14px"><label>地址</label><input id="cardAddress" /></div>
+      <div style="margin-top:14px"><label>備註</label><textarea id="cardNote"></textarea></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="addCardRecord()">新增這筆</button>
+      </div>
+      <div id="addCardMsg"></div>
+
+      <hr style="margin:24px 0; border:none; border-top:1px solid var(--border)" />
+
+      <div class="search-row">
+        <div class="search-row-keyword">
+          <label>模糊搜尋（公司/聯絡人/電話/手機/Email/地址/備註，皆可）</label>
+          <input id="cardSearchBox" class="search-big" placeholder="輸入關鍵字，例如：賴建文 或 眾山" onkeydown="if(event.key==='Enter') runCardSearch()" />
+        </div>
+      </div>
+      <div class="btn-row search-btn-row">
+        <button class="btn btn-primary" onclick="runCardSearch()">🔍 檢索</button>
+        <button class="btn btn-outline" onclick="clearCardSearch()">清除條件</button>
+        <div class="result-count">共 <b id="cardCount">-</b> 筆</div>
+      </div>
+
+      <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th style="width:90px">日期</th><th style="min-width:80px">公司/單位</th><th style="min-width:80px">聯絡人</th><th style="min-width:100px">電話</th><th style="min-width:100px">手機</th><th style="min-width:120px">Email</th><th>地址</th><th>備註</th><th style="width:90px">操作</th></tr>
+        </thead>
+        <tbody id="cardsBody"></tbody>
+      </table>
+      </div>
+      <div id="cardsPager" class="btn-row" style="align-items:center; justify-content:flex-end;"></div>
+    </div>
+
     <!-- 帳號管理畫面 (admin only) -->
     <div id="adminTab" class="card hidden">
       <h3 style="margin-top:0">新增登入帳號</h3>
@@ -455,6 +572,9 @@ let lastSearchResults = [];
 let resultsPage = 1;
 let allRecordsData = [];
 let allPage = 1;
+let cardsAllData = [];
+let cardsFilteredData = [];
+let cardsPage = 1;
 const PAGE_SIZE = 20;
 
 // 共用分頁列 render：page 從 1 開始，onPageChange(newPage) 由呼叫端提供
@@ -550,13 +670,14 @@ function enterApp() {
 
   runSearch();
   refreshAllRecords();
+  refreshCards();
   if (currentRole === 'admin') refreshAccounts();
   aiRestoreConversation();
 }
 
 // ---------- Tab 切換 ----------
 function switchTab(tab) {
-  ['query', 'input', 'admin'].forEach(t => {
+  ['query', 'input', 'cards', 'admin'].forEach(t => {
     document.getElementById(t + 'Tab').classList.toggle('hidden', t !== tab);
     document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
   });
@@ -824,6 +945,229 @@ async function saveEditRecord() {
   closeEditRecord();
   refreshAllRecords();
   runSearch();
+}
+
+// ---------- 名片管理 ----------
+// 拍照辨識名片：先拍正面 -> 問要不要拍反面 -> 不管有沒有反面，辨識完就直接存檔，
+// 不用像訪談紀錄那樣先帶入表單等確認，因為存檔後每一筆都能在下方清單直接編輯/刪除修正
+var cardFrontFields = null;
+
+async function handleCardOcrFile(event, side) {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+
+  const msgEl = document.getElementById('cardOcrMsg');
+  msgEl.innerHTML = `<div class="msg">🔍 辨識中，請稍候...</div>`;
+
+  try {
+    const dataUrl = await fileToResizedBase64(file, 1600, 0.82);
+    const resp = await fetch('/api/business-card-ocr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUrl, mime_type: 'image/jpeg' })
+    });
+    const result = await resp.json().catch(() => ({ error: '伺服器回應格式異常，可能是圖片仍然過大，請再拍近一點或裁切後再試' }));
+
+    if (!resp.ok || result.error) {
+      msgEl.innerHTML = `<div class="msg err">辨識失敗：${result.error || '未知錯誤'}，請重新拍照或直接手動輸入</div>`;
+      cardFrontFields = null;
+      return;
+    }
+
+    if (side === 'front') {
+      cardFrontFields = result;
+      msgEl.innerHTML = '';
+      document.getElementById('cardBackConfirmBox').classList.remove('hidden');
+    } else {
+      const merged = mergeCardFields(cardFrontFields, result);
+      cardFrontFields = null;
+      await saveCardRecord(merged, msgEl);
+    }
+  } catch (err) {
+    cardFrontFields = null;
+    msgEl.innerHTML = `<div class="msg err">辨識失敗：${err.message}，請重新拍照或直接手動輸入</div>`;
+  }
+}
+
+// 正反面欄位合併：同一欄位兩面都有值且不同，就換行合併保留；只有一面有值就用那一面
+function mergeCardFields(front, back) {
+  function pick(a, b) {
+    a = (a || '').trim();
+    b = (b || '').trim();
+    if (a && b) return a === b ? a : (a + '\n' + b);
+    return a || b || '';
+  }
+  return {
+    record_date: front.record_date || back.record_date || '',
+    company: pick(front.company, back.company),
+    contact: pick(front.contact, back.contact),
+    phone: pick(front.phone, back.phone),
+    mobile: pick(front.mobile, back.mobile),
+    email: pick(front.email, back.email),
+    address: pick(front.address, back.address),
+    note: pick(front.note, back.note)
+  };
+}
+
+async function cardBackConfirm(wantsBack) {
+  document.getElementById('cardBackConfirmBox').classList.add('hidden');
+  if (wantsBack) {
+    document.getElementById('cardOcrBackInput').click();
+  } else {
+    const fields = cardFrontFields;
+    cardFrontFields = null;
+    await saveCardRecord(fields, document.getElementById('cardOcrMsg'));
+  }
+}
+
+async function saveCardRecord(fields, msgEl) {
+  const record = {
+    record_date: fields.record_date || getTodayLocalDateStr(),
+    company: (fields.company || '').trim(),
+    contact: (fields.contact || '').trim(),
+    phone: (fields.phone || '').trim(),
+    mobile: (fields.mobile || '').trim(),
+    email: (fields.email || '').trim(),
+    address: (fields.address || '').trim(),
+    note: (fields.note || '').trim(),
+    uploaded_by: currentUser.email
+  };
+  const { error } = await sb.from('business_cards').insert(record);
+  if (error) {
+    msgEl.innerHTML = `<div class="msg err">存檔失敗：${error.message}</div>`;
+    return;
+  }
+  msgEl.innerHTML = `<div class="msg ok">✅ 已存檔。如果辨識有誤，可以在下方清單直接點「編輯」修改</div>`;
+  refreshCards();
+}
+
+// 手動輸入新增(不透過拍照)
+async function addCardRecord() {
+  const record = {
+    record_date: document.getElementById('cardDate').value || null,
+    company: document.getElementById('cardCompany').value.trim(),
+    contact: document.getElementById('cardContact').value.trim(),
+    phone: document.getElementById('cardPhone').value.trim(),
+    mobile: document.getElementById('cardMobile').value.trim(),
+    email: document.getElementById('cardEmail').value.trim(),
+    address: document.getElementById('cardAddress').value.trim(),
+    note: document.getElementById('cardNote').value.trim(),
+    uploaded_by: currentUser.email
+  };
+  const msgEl = document.getElementById('addCardMsg');
+  const { error } = await sb.from('business_cards').insert(record);
+  if (error) { msgEl.innerHTML = `<div class="msg err">新增失敗：${error.message}</div>`; return; }
+  msgEl.innerHTML = `<div class="msg ok">新增成功</div>`;
+  ['cardDate','cardCompany','cardContact','cardPhone','cardMobile','cardEmail','cardAddress','cardNote'].forEach(id => document.getElementById(id).value = '');
+  refreshCards();
+}
+
+async function refreshCards() {
+  const { data, error } = await sb.from('business_cards').select('*').order('record_date', { ascending: false }).order('created_at', { ascending: false });
+  if (error) { console.error('讀取名片資料失敗:', error); return; }
+  cardsAllData = data || [];
+  cardsFilteredData = cardsAllData;
+  cardsPage = 1;
+  renderCardsPage();
+}
+
+function runCardSearch() {
+  const kw = document.getElementById('cardSearchBox').value.trim().toLowerCase();
+  if (!kw) {
+    cardsFilteredData = cardsAllData;
+  } else {
+    cardsFilteredData = cardsAllData.filter(r =>
+      ['company', 'contact', 'phone', 'mobile', 'email', 'address', 'note'].some(f =>
+        String(r[f] || '').toLowerCase().indexOf(kw) !== -1
+      )
+    );
+  }
+  cardsPage = 1;
+  renderCardsPage();
+}
+
+function clearCardSearch() {
+  document.getElementById('cardSearchBox').value = '';
+  runCardSearch();
+}
+
+function renderCardsPage() {
+  document.getElementById('cardCount').textContent = cardsFilteredData.length;
+  const start = (cardsPage - 1) * PAGE_SIZE;
+  const pageItems = cardsFilteredData.slice(start, start + PAGE_SIZE);
+
+  const body = document.getElementById('cardsBody');
+  body.innerHTML = pageItems.map(r => `
+    <tr>
+      <td class="col-date">${r.record_date || ''}</td>
+      <td class="pre-nowrap col-company">${escapeHtml(r.company)}</td>
+      <td class="pre-nowrap col-person">${escapeHtml(r.contact)}</td>
+      <td class="pre-nowrap">${escapeHtml(r.phone)}</td>
+      <td class="pre-nowrap">${escapeHtml(r.mobile)}</td>
+      <td class="pre-nowrap">${escapeHtml(r.email)}</td>
+      <td class="col-content">${escapeHtml(r.address)}</td>
+      <td class="col-note">${escapeHtml(r.note)}</td>
+      <td>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-outline action-btn" onclick="openEditCard('${r.id}')">✏️<span class="btn-text"> 編輯</span></button>
+          <button class="btn btn-danger action-btn" onclick="deleteCard('${r.id}')">🗑️<span class="btn-text"> 刪除</span></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+
+  renderPager('cardsPager', cardsFilteredData.length, cardsPage, (p) => { cardsPage = p; renderCardsPage(); });
+}
+
+async function deleteCard(id) {
+  if (!confirm('確定刪除這張名片資料？')) return;
+  const { error } = await sb.from('business_cards').delete().eq('id', id);
+  if (error) { alert('刪除失敗：' + error.message); return; }
+  refreshCards();
+}
+
+let editingCardId = null;
+
+function openEditCard(id) {
+  const r = cardsAllData.find(x => x.id === id);
+  if (!r) { alert('找不到這筆資料，畫面可能過期，請重新整理再試'); return; }
+  editingCardId = id;
+  document.getElementById('cardEditDate').value = r.record_date || '';
+  document.getElementById('cardEditCompany').value = r.company || '';
+  document.getElementById('cardEditContact').value = r.contact || '';
+  document.getElementById('cardEditPhone').value = r.phone || '';
+  document.getElementById('cardEditMobile').value = r.mobile || '';
+  document.getElementById('cardEditEmail').value = r.email || '';
+  document.getElementById('cardEditAddress').value = r.address || '';
+  document.getElementById('cardEditNote').value = r.note || '';
+  document.getElementById('cardEditMsg').innerHTML = '';
+  document.getElementById('cardEditBox').classList.remove('hidden');
+}
+
+function closeEditCard() {
+  document.getElementById('cardEditBox').classList.add('hidden');
+  editingCardId = null;
+}
+
+async function saveEditCard() {
+  if (!editingCardId) return;
+  const msgEl = document.getElementById('cardEditMsg');
+  const updated = {
+    record_date: document.getElementById('cardEditDate').value || null,
+    company: document.getElementById('cardEditCompany').value.trim(),
+    contact: document.getElementById('cardEditContact').value.trim(),
+    phone: document.getElementById('cardEditPhone').value.trim(),
+    mobile: document.getElementById('cardEditMobile').value.trim(),
+    email: document.getElementById('cardEditEmail').value.trim(),
+    address: document.getElementById('cardEditAddress').value.trim(),
+    note: document.getElementById('cardEditNote').value.trim()
+  };
+  const { error } = await sb.from('business_cards').update(updated).eq('id', editingCardId);
+  if (error) { msgEl.innerHTML = `<div class="msg err">儲存失敗：${error.message}</div>`; return; }
+
+  closeEditCard();
+  refreshCards();
 }
 
 // ---------- Excel 匯入 / 匯出 ----------
@@ -1169,14 +1513,22 @@ function aiUpdateLastMessage(text) {
 }
 
 // 先把資料庫裡出現過的人員/公司名稱抓一份快取起來，比對問題裡有沒有提到，
-// 藉此判斷該用哪些關鍵字去查 interview_records（人員欄位可能一格存多人、用換行分隔）
+// 藉此判斷該用哪些關鍵字去查 interview_records 跟 business_cards（人員欄位可能一格存多人、用換行分隔）
 var aiEntityCache = null;
 async function aiLoadEntityCache() {
   if (aiEntityCache) return aiEntityCache;
-  var { data, error } = await sb.from('interview_records').select('person,company');
   var set = new Set();
-  (data || []).forEach(function (r) {
+  var [{ data: recs }, { data: cards }] = await Promise.all([
+    sb.from('interview_records').select('person,company'),
+    sb.from('business_cards').select('contact,company')
+  ]);
+  (recs || []).forEach(function (r) {
     String(r.person || '').split('\n').forEach(function (p) { p = p.trim(); if (p) set.add(p); });
+    var c = String(r.company || '').trim();
+    if (c) set.add(c);
+  });
+  (cards || []).forEach(function (r) {
+    String(r.contact || '').split('\n').forEach(function (p) { p = p.trim(); if (p) set.add(p); });
     var c = String(r.company || '').trim();
     if (c) set.add(c);
   });
@@ -1184,29 +1536,42 @@ async function aiLoadEntityCache() {
   return aiEntityCache;
 }
 
-// 依問題內容找出對應的訪談紀錄：優先用問題裡有出現過的人員/公司名稱去查，
+// 依問題內容找出對應的訪談紀錄跟名片資料：優先用問題裡有出現過的人員/公司名稱去查，
 // 完全比對不到才退而求其次，直接拿整句問題去模糊比對所有欄位
 async function aiSearchRecordsForQuestion(question) {
   var entities = await aiLoadEntityCache();
   var matched = entities.filter(function (e) { return question.indexOf(e) !== -1; });
 
-  var query = sb.from('interview_records').select('*').order('record_date', { ascending: false }).limit(50);
+  var recQuery = sb.from('interview_records').select('*').order('record_date', { ascending: false }).limit(50);
+  var cardQuery = sb.from('business_cards').select('*').order('record_date', { ascending: false }).limit(50);
+
   if (matched.length > 0) {
-    var orExpr = matched.map(function (e) {
+    var recOr = matched.map(function (e) {
       var like = '%' + e + '%';
       return 'person.ilike.' + like + ',company.ilike.' + like;
     }).join(',');
-    query = query.or(orExpr);
+    var cardOr = matched.map(function (e) {
+      var like = '%' + e + '%';
+      return 'contact.ilike.' + like + ',company.ilike.' + like;
+    }).join(',');
+    recQuery = recQuery.or(recOr);
+    cardQuery = cardQuery.or(cardOr);
   } else {
     var like = '%' + question.trim() + '%';
-    query = query.or(
+    recQuery = recQuery.or(
       'company.ilike.' + like + ',person.ilike.' + like + ',content.ilike.' + like
       + ',companion.ilike.' + like + ',note.ilike.' + like
     );
+    cardQuery = cardQuery.or(
+      'company.ilike.' + like + ',contact.ilike.' + like + ',phone.ilike.' + like
+      + ',mobile.ilike.' + like + ',email.ilike.' + like + ',address.ilike.' + like + ',note.ilike.' + like
+    );
   }
-  var { data, error } = await query;
-  if (error) { console.error('AI問答查詢紀錄失敗:', error); return []; }
-  return data || [];
+
+  var [{ data: recData, error: recErr }, { data: cardData, error: cardErr }] = await Promise.all([recQuery, cardQuery]);
+  if (recErr) console.error('AI問答查詢訪談紀錄失敗:', recErr);
+  if (cardErr) console.error('AI問答查詢名片資料失敗:', cardErr);
+  return { records: recData || [], cards: cardData || [] };
 }
 
 async function submitAiQuestion() {
@@ -1219,11 +1584,11 @@ async function submitAiQuestion() {
   var loadingBubble = appendAiQaBubble('ai', '思考中...');
   btn.disabled = true;
   try {
-    var records = await aiSearchRecordsForQuestion(question);
+    var found = await aiSearchRecordsForQuestion(question);
     var resp = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: question, records: records, asker_email: currentUser ? currentUser.email : null })
+      body: JSON.stringify({ question: question, records: found.records, cards: found.cards, asker_email: currentUser ? currentUser.email : null })
     });
     var result = await resp.json().catch(function () { return { error: '伺服器回應格式異常' }; });
     var finalText;
